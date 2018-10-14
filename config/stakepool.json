@@ -1,0 +1,28 @@
+{
+    "mode": "master",
+    "debug": true,
+    "particlbindir": "",
+    "particldatadir": "",
+    "startheight": 0,
+    "pooladdress": "",
+    "rewardaddress": "",
+    "zmqhost": "tcp://127.0.0.1",
+    "zmqport": 20792,
+    "htmlhost": "",
+    "htmlport": n,
+    "maxoutputspertx": n,
+    "parameters": [
+        {
+            "height": 0,
+            "poolfeepercent": 2,
+            "stakebonuspercent": 5,
+            "payoutthreshold": 0.1,
+            "minblocksbetweenpayments": 100,
+            "minoutputvalue": 0.01,
+        },
+        {
+            "height": 1000,
+            "poolfeepercent": 5,
+        },
+    ]
+}

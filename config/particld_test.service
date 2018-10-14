@@ -1,0 +1,36 @@
+
+[Unit]
+Description=Particl daemon testnet
+After=network.target
+
+[Service]
+ExecStart=/home/stakepooluser/particl-binaries/particld -daemon -datadir=/home/stakepooluser/stakepoolDemoTest -pid=/run/particld_testnet/particld.pid
+
+RuntimeDirectory=particld_testnet
+User=stakepooluser
+Type=forking
+PIDFile=/run/particld_testnet/particld.pid
+Restart=on-failure
+
+# Hardening measures
+####################
+
+# Provide a private /tmp and /var/tmp.
+PrivateTmp=true
+
+# Mount /usr, /boot/ and /etc read-only for the process.
+ProtectSystem=full
+
+# Disallow the process and all of its children to gain
+# new privileges through execve().
+NoNewPrivileges=true
+
+# Use a new /dev namespace only populated with API pseudo devices
+# such as /dev/null, /dev/zero and /dev/random.
+PrivateDevices=true
+
+# Deny the creation of writable and executable memory mappings.
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target
