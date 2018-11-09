@@ -698,7 +698,7 @@ class StakePool():
         try:
             for i in range(5):
                 k, v = next(it)
-                lastPayments.append((struct.unpack('>i', k[1:5])[0], k[6:38].hex(), int.from_bytes(v[:8], 'big')))
+                lastPayments.append((struct.unpack('>i', k[1:5])[0], k[5:38].hex(), int.from_bytes(v[:8], 'big')))
         except Exception:
             pass
         it.close()
