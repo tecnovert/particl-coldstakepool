@@ -957,6 +957,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def putHeaders(self, status_code, content_type):
         self.send_response(status_code)
+        self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Content-type', content_type)
         self.end_headers()
 
@@ -991,6 +992,11 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/html')
         self.end_headers()
 
+    def do_OPTIONS(self):
+        self.send_response(200, "ok")
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header("Access-Control-Allow-Headers", '*')
+        self.end_headers()
 
 class HttpThread(threading.Thread, HTTPServer):
     def __init__(self, fp, hostName, portNo, stakePool):
