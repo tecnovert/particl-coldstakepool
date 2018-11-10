@@ -59,8 +59,6 @@ $ ./particl-binaries/particl-cli -datadir=/home/stakepooluser/stakepoolDemoLive 
 $ lynx localhost:9000
 
 
-
-
 $ sudo rm /etc/nginx/sites-enabled/default
 $ sudo cp stakepool/config/nginx_stakepool_forward.conf /etc/nginx/conf.d/
 
@@ -77,4 +75,20 @@ http://vpsip:901/
 
 Check that it all starts back up:
 $ sudo reboot
+
+
+-- nginx production config
+The production configuration enables:
+* open CORS - anyone can embed the statistics in their website
+* caching (expires after 2 minutes)
+* uses port 80
+
+$ mkdir /tmp/nginx
+$ sudo rm stakepool/config/nginx_stakepool_forward.conf
+$ sudo cp stakepool/config/nginx_stakepool_production.conf /etc/nginx/conf.d/
+$ sudo systemctl restart nginx
+
+Test, browse to:
+http://vpsip/
+http://vpsip/testnet
 
