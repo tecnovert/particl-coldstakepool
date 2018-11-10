@@ -20,6 +20,7 @@ Dependencies:
 import sys
 import os
 import time
+import datetime as dt
 import decimal
 import json
 import zmq
@@ -28,6 +29,7 @@ import traceback
 import plyvel
 import struct
 import signal
+import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import http.client
 from functools import wraps
@@ -43,9 +45,11 @@ COIN = 100000000
 DBT_DATA = ord('d')
 DBT_BAL = ord('b')
 DBT_POOL_BAL = ord('p')
-DBT_POOL_BLOCK = ord('B')  # Key height : data blockhash + blockreward
+DBT_POOL_BLOCK = ord('B')  # Key height : data blockhash + blockreward + poolcointotal
 DBT_POOL_PAYOUT = ord('P')  # Key height + txhash : data totalDisbursed
 DBT_POOL_PENDING_PAYOUT = ord('Q')
+DBT_POOL_METRICS = ord('M')  # Key Y-m : data nblocks + totalcoin
+
 
 decimal.getcontext().prec = 8
 
@@ -355,6 +359,16 @@ class StakePool():
         blocksFound = 1 if n is None else struct.unpack('>i', n)[0] + 1
         b.put(dbkey, struct.pack('>i', blocksFound))
 
+        # TODO: add time to getblockreward
+        blockinfo = callrpc(self.rpc_port, self.rpc_auth, 'getblock', [reward['blockhash']])
+        date = dt.datetime.fromtimestamp(int(blockinfo['time'])).strftime('%Y-%m')
+
+        dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
+        m = db.get(dbkey)
+        data = [1, poolCoinTotal]
+        month_metrics = data if m is None else [struct.unpack('>i', m[:4])[0] + data[0], int.from_bytes(m[4:20], 'big') + data[1]]
+        db.put(dbkey, struct.pack('>i', month_metrics[0]) + month_metrics[1].to_bytes(16, 'big'))
+
         poolRewardClients = int(poolRewardClients)
         for k, v in totals.items():
 
@@ -585,9 +599,9 @@ class StakePool():
                 addrPaidout += v
                 totalDisbursed += v
                 if addrPending < 0:
-                    logmt(self.fp, 'WARNING: txn %s overpays address %s more than pending payout, pending: %d, paid: %d.\n' % (txid, address, addrPending+v, v), True, True)
+                    logmt(self.fp, 'WARNING: txn %s overpays address %s more than pending payout, pending: %d, paid: %d.\n' % (txid, address, addrPending + v, v), True, True)
                     if addrReward + addrPending < 0:
-                        logmt(self.fp, 'WARNING: txn %s overpays address %s more than accumulated reward %d, paid: %d.\n' % (txid, address, addrPending+v, v), True, True)
+                        logmt(self.fp, 'WARNING: txn %s overpays address %s more than accumulated reward %d, paid: %d.\n' % (txid, address, addrPending + v, v), True, True)
                     else:
                         addrReward += addrPending
                     addrPending = 0
@@ -646,6 +660,62 @@ class StakePool():
         rv['currenttotal'] = totalCoinCurrent
 
         return rv
+
+    @getDBMutex
+    def rebuildMetrics(self):
+
+        # Remove old cache
+        db = plyvel.DB(self.dbPath)
+        it = db.iterator(prefix=bytes([DBT_POOL_METRICS]))
+        try:
+            while True:
+                k, v = next(it)
+                db.delete(k)
+        except Exception:
+            pass
+        it.close()
+
+        num_blocks = 0
+        it = db.iterator(prefix=bytes([DBT_POOL_BLOCK]), reverse=True)
+        try:
+            while True:
+                k, v = next(it)
+                foundblock = (struct.unpack('>i', k[1:])[0], v[:32].hex(), int.from_bytes(v[32:40], 'big'), int.from_bytes(v[40:48], 'big'))
+
+                blockinfo = callrpc(self.rpc_port, self.rpc_auth, 'getblock', [foundblock[1]])
+                date = dt.datetime.fromtimestamp(int(blockinfo['time'])).strftime('%Y-%m')
+
+                dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
+                m = db.get(dbkey)
+                data = [1, foundblock[3]]
+                month_metrics = data if m is None else [struct.unpack('>i', m[:4])[0] + data[0], int.from_bytes(m[4:20], 'big') + data[1]]
+                db.put(dbkey, struct.pack('>i', month_metrics[0]) + month_metrics[1].to_bytes(16, 'big'))
+
+                num_blocks += 1
+        except Exception:
+            pass
+        it.close()
+        db.close()
+
+        return {'processedblocks': num_blocks}
+
+    @getDBMutex
+    def getMetrics(self):
+
+        db = plyvel.DB(self.dbPath)
+        month_metrics = []
+        it = db.iterator(prefix=bytes([DBT_POOL_METRICS]), reverse=True)
+        try:
+            for i in range(12):
+                k, v = next(it)
+                data = (struct.unpack('>i', v[:4])[0], int.from_bytes(v[4:20], 'big'))
+                month_metrics.append([k[1:].decode('UTF-8'), data[0], data[1] // data[0]])
+        except Exception:
+            pass
+        it.close()
+        db.close()
+
+        return month_metrics
 
     @getDBMutex
     def getSummary(self, opts=None):
@@ -744,12 +814,29 @@ class HttpHandler(BaseHTTPRequestHandler):
     def js_address(self, urlSplit):
 
         if len(urlSplit) < 4:
-            return self.page_error('Must specify address')
+            return self.js_error('Must specify address')
 
         address_str = urlSplit[3]
         stakePool = self.server.stakePool
         try:
             return bytes(json.dumps(stakePool.getAddressSummary(address_str)), 'UTF-8')
+        except Exception as e:
+            return self.js_error(str(e))
+
+    def js_metrics(self, urlSplit):
+        stakePool = self.server.stakePool
+        if len(urlSplit) > 3:
+            code_str = urlSplit[3]
+            salt = 'ajf8923ol2xcv.'
+            hashed = hashlib.sha256(str(code_str + salt).encode('utf-8')).hexdigest()
+            if not hashed == 'fd5816650227b75143e60c61b19e113f43f5dcb57e2aa5b6161a50973f2033df':
+                return self.js_error('Unknown argument')
+            try:
+                return bytes(json.dumps(stakePool.rebuildMetrics()), 'UTF-8')
+            except Exception as e:
+                return self.js_error(str(e))
+        try:
+            return bytes(json.dumps(stakePool.getMetrics()), 'UTF-8')
         except Exception as e:
             return self.js_error(str(e))
 
@@ -886,6 +973,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if len(urlSplit) > 2:
                     if urlSplit[2] == 'address':
                         return self.js_address(urlSplit)
+                    if urlSplit[2] == 'metrics':
+                        return self.js_metrics(urlSplit)
                 return self.js_index(urlSplit)
 
         self.putHeaders(status_code, 'text/html')
@@ -930,7 +1019,6 @@ class HttpThread(threading.Thread, HTTPServer):
 
     def serve_forever(self):
         while not self.stopped():
-            #print('serve_forever')
             self.handle_request()
 
     def run(self):
@@ -1025,7 +1113,7 @@ def main():
         print('Unknown argument', v)
 
     if dataDir is None:
-        dataDir = os.path.join(os.path.expanduser('~/.particl', ('' if chain == 'mainnet' else chain), 'stakepool'))
+        dataDir = os.path.join(os.path.expanduser('~/.particl'), ('' if chain == 'mainnet' else chain), 'stakepool')
 
     print('dataDir:', dataDir)
     if chain != 'mainnet':
