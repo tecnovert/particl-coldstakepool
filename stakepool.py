@@ -655,6 +655,14 @@ class StakePool():
 
         db = plyvel.DB(self.dbPath)
 
+        rv['pooladdress'] = self.poolAddr
+        rv['poolfeepercent'] = self.poolFeePercent
+        rv['stakebonuspercent'] = self.stakeBonusPercent
+
+        rv['payoutthreshold'] = self.payoutThreshold 
+        rv['minblocksbetweenpayments'] = self.minBlocksBetweenPayments 
+        rv['minoutputvalue'] = self.minOutputValue
+
         n = db.get(bytes([DBT_DATA]) + b'current_height')
         rv['poolheight'] = 0 if n is None else struct.unpack('>i', n)[0]
 
@@ -718,9 +726,11 @@ class StakePool():
 
         try:
             walletinfo = callrpc(self.rpc_port, self.rpc_auth, 'getwalletinfo', [], 'pool_stake')
-            rv['watchonlytotalbalance'] = walletinfo['watchonly_total_balance']
+            rv['watchonlytotalbalance'] = walletinfo['watchonly_total_balance'] 
+            rv['stakedbalance'] = walletinfo['staked_balance'] 
         except Exception:
             rv['watchonlytotalbalance'] = 0
+            rv['stakedbalance'] = 0
 
         return rv
 
