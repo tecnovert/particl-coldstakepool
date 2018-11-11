@@ -79,9 +79,9 @@ $ sudo reboot
 
 -- nginx production config
 The production configuration enables:
-* open CORS - anyone can embed the statistics in their website
 * caching (expires after 2 minutes)
 * uses port 80
+* HTTPS / TLS support
 
 $ mkdir /tmp/nginx
 $ sudo rm stakepool/config/nginx_stakepool_forward.conf
@@ -109,3 +109,21 @@ $ yarn install
 $ yarn run build
 $ cp -R dist /var/www/html/pool
 
+-- setup a domain name
+https://kerneltalks.com/howto/how-to-setup-domain-name-in-linux-server/
+
+-- setup tls
+$ sudo apt-get update
+$ sudo apt-get install software-properties-common
+$ sudo add-apt-repository ppa:certbot/certbot
+$ sudo apt-get update
+$ sudo apt-get install python-certbot-nginx 
+
+Create the certificates, enter your domain name in the interactive wizard:
+$ sudo certbot --nginx certonly
+
+Edit the /etc/nginx/conf.d/nginx_stakepool_production.conf,
+uncomment the 4 settings from the configuration that related to SSL.
+Replace example.com with your domain name.
+$ vi /etc/nginx/conf.d/nginx_stakepool_production.conf
+$ sudo systemctl restart nginx
