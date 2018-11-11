@@ -4,7 +4,7 @@ $ ssh stakepooluser@stakepoolvps
 $ sudo apt-get install gnupg wget python3 git nginx tmux python3-zmq python3-pip lynx htop
 $ pip3 install plyvel
 
-$ git clone https://github.com/tecnovert/particl-coldstakepool stakepool
+$ git clone https://github.com/particl/coldstakepool stakepool
 
 
 -- Testnet
