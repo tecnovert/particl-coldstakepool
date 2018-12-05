@@ -1,6 +1,15 @@
 ------ Stakepool Setup on Ubuntu Xenial ------
 
+This example should be run as a user named stakepooluser.
+To run as a different user replace all instances of 'stakepooluser' with your
+username both in this guide and in the .service files in the config directory.
+eg:
+sed -i -- 's/stakepooluser/YOURUSERNAME/g' stakepool/config/*.service
+
+
+First login to your VPS, replace stakepoolvps with the correct ip address:
 $ ssh stakepooluser@stakepoolvps
+
 $ sudo apt-get install gnupg wget python3 git nginx tmux python3-zmq python3-pip lynx htop
 $ pip3 install plyvel
 
@@ -27,7 +36,7 @@ $ sudo systemctl start particld_test.service stakepool_test.service
 $ sudo systemctl enable particld_test.service stakepool_test.service
 
 Test:
-$ sudo tailf /var/log/syslog
+$ sudo tail -f /var/log/syslog
 $ ./particl-binaries/particl-cli -datadir=/home/stakepooluser/stakepoolDemoTest getblockchaininfo
 $ lynx localhost:9001
 
@@ -54,7 +63,7 @@ $ sudo systemctl start particld_live.service stakepool_live.service
 $ sudo systemctl enable particld_live.service stakepool_live.service
 
 Test:
-$ sudo tailf /var/log/syslog
+$ sudo tail -f /var/log/syslog
 $ ./particl-binaries/particl-cli -datadir=/home/stakepooluser/stakepoolDemoLive getblockchaininfo
 $ lynx localhost:9000
 
@@ -117,7 +126,7 @@ $ sudo apt-get update
 $ sudo apt-get install software-properties-common
 $ sudo add-apt-repository ppa:certbot/certbot
 $ sudo apt-get update
-$ sudo apt-get install python-certbot-nginx 
+$ sudo apt-get install python-certbot-nginx
 
 Create the certificates, enter your domain name in the interactive wizard:
 $ sudo certbot --nginx certonly
