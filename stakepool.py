@@ -294,8 +294,11 @@ class StakePool():
                         logmt(self.fp, 'WARNING: Pool reward mismatch at height %d\n' % (height))
                     try:
                         self.processPoolBlock(height, reward, db, b, batchBalances)
-                    except Exception:
-                        traceback.print_exc()
+                    except Exception as ex:
+                        exc_type, exc_value, exc_tb = sys.exc_info()
+                        traceback.print_exception(exc_type, exc_value, exc_tb)
+                        traceback.print_exception(exc_type, exc_value, exc_tb, file=self.fp)
+                        self.fp.flush()
                     break
             except Exception:
                 pass
@@ -340,14 +343,14 @@ class StakePool():
         blockReward = int(decimal.Decimal(reward['blockreward']) * COIN)
 
         # Coin paid to the pool operator
-        poolReward = (blockReward * (self.poolFeePercent * (COIN // 100))) // COIN
+        poolReward = int((blockReward * (self.poolFeePercent * (COIN // 100))) // COIN)
 
         stakeBonus = 0
         if self.stakeBonusPercent > 0:
-            stakeBonus = (blockReward * (self.stakeBonusPercent * (COIN // 100))) // COIN
+            stakeBonus = int((blockReward * (self.stakeBonusPercent * (COIN // 100))) // COIN)
 
         # Coin paid to the pool participants
-        poolRewardClients = blockReward - (poolReward + stakeBonus)
+        poolRewardClients = int(blockReward - (poolReward + stakeBonus))
 
         #addrsToPay = []
 
@@ -359,9 +362,12 @@ class StakePool():
         blocksFound = 1 if n is None else struct.unpack('>i', n)[0] + 1
         b.put(dbkey, struct.pack('>i', blocksFound))
 
-        # TODO: add time to getblockreward
-        blockinfo = callrpc(self.rpc_port, self.rpc_auth, 'getblock', [reward['blockhash']])
-        date = dt.datetime.fromtimestamp(int(blockinfo['time'])).strftime('%Y-%m')
+        if 'blocktime' in reward:
+            date = dt.datetime.fromtimestamp(int(reward['blocktime'])).strftime('%Y-%m')
+        else:
+            # TODO: Remove
+            blockinfo = callrpc(self.rpc_port, self.rpc_auth, 'getblock', [reward['blockhash']])
+            date = dt.datetime.fromtimestamp(int(blockinfo['time'])).strftime('%Y-%m')
 
         dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
         m = db.get(dbkey)
@@ -372,14 +378,14 @@ class StakePool():
         poolRewardClients = int(poolRewardClients)
         for k, v in totals.items():
 
-            addrReward = (poolRewardClients * COIN * v) // (poolCoinTotal)
+            addrReward = int((poolRewardClients * COIN * v) // (poolCoinTotal))
             addrTotal = addrReward
 
             assignedStakeBonus = 0
             if stakeBonus > 0 and k == reward['kernelscript']['spendaddr']:
                 #if self.debug:
                 #    logm(self.fp, 'Assigning stake bonus to %s %s\n' % (k, format8(stakeBonus)))
-                addrTotal += stakeBonus * COIN
+                addrTotal += int(stakeBonus * COIN)
                 assignedStakeBonus = stakeBonus
                 stakeBonus = 0
 
@@ -410,7 +416,7 @@ class StakePool():
             if self.debug:
                 logmt(self.fp, 'Unassigned stake bonus: %s %s\n' % (reward['kernelscript']['spendaddr'], format8(stakeBonus)))
 
-        poolRewardTotal = poolReward + stakeBonus
+        poolRewardTotal = int(poolReward + stakeBonus)
         dbkey = bytes([DBT_POOL_BAL]) + decodeAddress(self.poolAddrReward)
         n = db.get(dbkey)
         if n is not None:
@@ -788,8 +794,8 @@ class StakePool():
 
         try:
             walletinfo = callrpc(self.rpc_port, self.rpc_auth, 'getwalletinfo', [], 'pool_stake')
-            rv['watchonlytotalbalance'] = walletinfo['watchonly_total_balance'] 
-            rv['stakedbalance'] = walletinfo['staked_balance'] 
+            rv['watchonlytotalbalance'] = walletinfo['watchonly_total_balance']
+            rv['stakedbalance'] = walletinfo['staked_balance']
         except Exception:
             rv['watchonlytotalbalance'] = 0
             rv['stakedbalance'] = 0

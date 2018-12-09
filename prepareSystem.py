@@ -60,7 +60,6 @@ PARTICL_VERSION = '0.17.0.3'
 PARTICL_VERSION_TAG = ''
 
 
-
 def startDaemon(nodeDir, bindir):
     command_cli = os.path.join(bindir, PARTICLD)
 
@@ -82,7 +81,8 @@ class AppPrepare():
 
 
 def printHelp():
-    print('Usage: prepareStakepool.py ')
+    print('Usage: prepareSystem.py ')
+    print('\n--update_core              Download Particl core release and exit.')
     print('\n--datadir=PATH             Path to Particl data directory, default:~/.particl.')
     print('\n--testnet                  Run Particl in testnet mode.')
     print('\n--mainnet                  Run Particl in mainnet mode.')
@@ -90,6 +90,62 @@ def printHelp():
     print('\n--reward_wallet_mnemonic=  Recovery phrase to use for the reward wallet, default is randomly generated.')
     print('\n--mode=master/observer     Mode stakepool is initialised to. observer mode requires configurl to be specified, default:master.')
     print('\n--configurl=url            Url to pull the stakepool config file from when initialising for observer mode.')
+
+
+def downloadParticlCore():
+    print('Download and verify Particl core release.')
+
+    url_sig = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-linux/tecnovert/particl-linux-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, PARTICL_VERSION)
+    url_release = 'https://github.com/particl/particl-core/releases/download/v%s/particl-%s-x86_64-linux-gnu.tar.gz' % (PARTICL_VERSION + PARTICL_VERSION_TAG, PARTICL_VERSION)
+
+    assert_path = os.path.join(PARTICL_BINDIR, 'particl-linux-%s-build.assert' % (PARTICL_VERSION))
+    if not os.path.exists(assert_path):
+        subprocess.check_call(['wget', url_sig + '-build.assert', '-P', PARTICL_BINDIR])
+
+    sig_path = os.path.join(PARTICL_BINDIR, 'particl-linux-%s-build.assert.sig' % (PARTICL_VERSION))
+    if not os.path.exists(sig_path):
+        subprocess.check_call(['wget', url_sig + '-build.assert.sig?raw=true', '-O', sig_path])
+
+    packed_path = os.path.join(PARTICL_BINDIR, 'particl-%s-x86_64-linux-gnu.tar.gz' % (PARTICL_VERSION))
+    if not os.path.exists(packed_path):
+        subprocess.check_call(['wget', url_release, '-P', PARTICL_BINDIR])
+
+    hasher = hashlib.sha256()
+    with open(packed_path, 'rb') as fp:
+        hasher.update(fp.read())
+    release_hash = hasher.digest()
+
+    print('Release hash:', release_hash.hex())
+    with open(assert_path, 'rb', 0) as fp, mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ) as s:
+        if s.find(bytes(release_hash.hex(), 'utf-8')) == -1:
+            print('Error: release hash %s not found in assert file.' % (release_hash.hex()))
+            exit(1)
+        else:
+            print('Found release hash %s in assert file.' % (release_hash.hex()))
+
+    signing_key_fingerprint = '8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B'
+    try:
+        subprocess.check_call(['gpg', '--list-keys', signing_key_fingerprint])
+    except Exception:
+        print('Downloading release signing pubkey')
+        subprocess.check_call(['gpg', '--keyserver', 'hkp://subset.pool.sks-keyservers.net', '--recv-keys', signing_key_fingerprint])
+        subprocess.check_call(['gpg', '--list-keys', signing_key_fingerprint])
+
+    try:
+        subprocess.check_call(['gpg', '--verify', sig_path, assert_path])
+    except Exception:
+        print('Error: Signature verification failed!')
+        exit(1)
+
+    daemon_path = os.path.join(PARTICL_BINDIR, PARTICLD)
+    subprocess.check_call(['tar', '-xvf', packed_path, '-C', PARTICL_BINDIR])
+    bin_path = os.path.join(PARTICL_BINDIR, 'particl-%s/bin/*' % (PARTICL_VERSION))
+    subprocess.check_call(['cp ' + bin_path + ' ' + PARTICL_BINDIR], shell=True)
+
+    output = subprocess.check_output([os.path.join(PARTICL_BINDIR, 'particld') + ' --version'], shell=True)
+    version = output.splitlines()[0].decode('utf-8')
+    print('particld --version\n'+version)
+    assert(PARTICL_VERSION in version)
 
 
 def main():
@@ -115,6 +171,9 @@ def main():
 
         if name == 'h' or name == 'help':
             printHelp()
+            return 0
+        if name == 'update_core':
+            downloadParticlCore()
             return 0
         if name == 'testnet':
             chain = 'testnet'
@@ -152,56 +211,8 @@ def main():
     if not os.path.exists(PARTICL_BINDIR):
         os.makedirs(PARTICL_BINDIR)
 
-    print('Download and verify preview version of particl-core.')
-
-    url_sig = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-linux/tecnovert/particl-linux-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, PARTICL_VERSION)
-    url_release = 'https://github.com/particl/particl-core/releases/download/v%s/particl-%s-x86_64-linux-gnu.tar.gz' % (PARTICL_VERSION + PARTICL_VERSION_TAG, PARTICL_VERSION)
-
-    assert_path = os.path.join(PARTICL_BINDIR, 'particl-linux-%s-build.assert' % (PARTICL_VERSION))
-    if not os.path.exists(assert_path):
-        subprocess.check_call(['wget', url_sig + '-build.assert', '-P', PARTICL_BINDIR])
-
-    sig_path = os.path.join(PARTICL_BINDIR, 'particl-linux-%s-build.assert.sig' % (PARTICL_VERSION))
-    if not os.path.exists(sig_path):
-        subprocess.check_call(['wget', url_sig + '-build.assert.sig?raw=true', '-O', sig_path])
-
-    packed_path = os.path.join(PARTICL_BINDIR, 'particl-%s-x86_64-linux-gnu.tar.gz' % (PARTICL_VERSION))
-    if not os.path.exists(packed_path):
-        subprocess.check_call(['wget', url_release, '-P', PARTICL_BINDIR])
-
-    # 1. Download and verify a preview version of particl-core
-    hasher = hashlib.sha256()
-    with open(packed_path, 'rb') as fp:
-        hasher.update(fp.read())
-    release_hash = hasher.digest()
-
-    print('Release hash:', release_hash.hex())
-    with open(assert_path, 'rb', 0) as fp, mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ) as s:
-        if s.find(bytes(release_hash.hex(), 'utf-8')) == -1:
-            print('Error: release hash %s not found in assert file.' % (release_hash.hex()))
-            exit(1)
-        else:
-            print('Found release hash %s in assert file.' % (release_hash.hex()))
-
-    signing_key_fingerprint = '8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B'
-    try:
-        subprocess.check_call(['gpg', '--list-keys', signing_key_fingerprint])
-    except Exception:
-        print('Downloading release signing pubkey')
-        subprocess.check_call(['gpg', '--keyserver', 'hkp://subset.pool.sks-keyservers.net', '--recv-keys', signing_key_fingerprint])
-        subprocess.check_call(['gpg', '--list-keys', signing_key_fingerprint])
-
-    try:
-        subprocess.check_call(['gpg', '--verify', sig_path, assert_path])
-    except Exception:
-        print('Error: Signature verification failed!')
-        exit(1)
-
-    daemon_path = os.path.join(PARTICL_BINDIR, PARTICLD)
-    if not os.path.exists(daemon_path):
-        subprocess.check_call(['tar', '-xvf', packed_path, '-C', PARTICL_BINDIR])
-        bin_path = os.path.join(PARTICL_BINDIR, 'particl-%s/bin/*' % (PARTICL_VERSION))
-        subprocess.check_call(['mv ' + bin_path + ' ' + PARTICL_BINDIR], shell=True)
+    # 1. Download and verify the specified version of particl-core
+    downloadParticlCore()
 
     dataDirWasNone = False
     if dataDir is None:
