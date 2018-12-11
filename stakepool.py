@@ -36,6 +36,7 @@ from functools import wraps
 from util import *
 
 DEBUG = True
+ALLOW_CORS = True
 WRITE_TO_LOG_FILE = True
 
 
@@ -804,7 +805,6 @@ class StakePool():
 
 
 class HttpHandler(BaseHTTPRequestHandler):
-
     def page_error(self, error_str):
         content = '<!DOCTYPE html><html lang="en">\n<head>' \
             + '<meta charset="UTF-8">' \
@@ -963,7 +963,8 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def putHeaders(self, status_code, content_type):
         self.send_response(status_code)
-        self.send_header('Access-Control-Allow-Origin', '*')
+        if self.server.allow_cors:
+            self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Content-type', content_type)
         self.end_headers()
 
@@ -994,24 +995,25 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.wfile.write(response)
 
     def do_HEAD(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
+        self.putHeaders(200, 'text/html')
 
     def do_OPTIONS(self):
-        self.send_response(200, "ok")
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header("Access-Control-Allow-Headers", '*')
+        self.send_response(200, 'ok')
+        if self.server.allow_cors:
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Headers', '*')
         self.end_headers()
 
+
 class HttpThread(threading.Thread, HTTPServer):
-    def __init__(self, fp, hostName, portNo, stakePool):
+    def __init__(self, fp, hostName, portNo, allow_cors, stakePool):
         threading.Thread.__init__(self)
 
         self.stop_event = threading.Event()
         self.fp = fp
         self.hostName = hostName
         self.portNo = portNo
+        self.allow_cors = allow_cors
         self.stakePool = stakePool
 
         self.timeout = 60
@@ -1068,7 +1070,8 @@ def runStakePool(fp, dataDir, chain):
     threads = []
     if 'htmlhost' in settings:
         logmt(fp, 'Starting server at %s:%d.' % (settings['htmlhost'], settings['htmlport']))
-        tS1 = HttpThread(fp, settings['htmlhost'], settings['htmlport'], stakePool)
+        allow_cors = settings['allowcors'] if 'allowcors' in settings else ALLOW_CORS
+        tS1 = HttpThread(fp, settings['htmlhost'], settings['htmlport'], allow_cors, stakePool)
         threads.append(tS1)
         tS1.start()
 

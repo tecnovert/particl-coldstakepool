@@ -10,6 +10,7 @@
     "zmqport": 20792,
     "htmlhost": "",
     "htmlport": n,
+    "allowcors": true,
     "maxoutputspertx": n,
     "parameters": [
         {
