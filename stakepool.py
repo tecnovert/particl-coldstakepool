@@ -569,6 +569,19 @@ class StakePool():
 
             totalDisbursed = 0
             for out in ro['vout']:
+                try:
+                    if out['type'] == 'data':
+                        continue
+                    if out['type'] == 'blind':
+                        logmt(self.fp, 'WARNING: Found txn %s paying to blinded output.\n' % (txid))
+                        continue
+                    if out['type'] == 'anon':
+                        logmt(self.fp, 'WARNING: Found txn %s paying to anon output.\n' % (txid))
+                        continue
+                except Exception:
+                    logmt(self.fp, 'WARNING: Found txn %s paying to unknown output type.\n' % (txid))
+                    continue
+
                 address = None
                 try:
                     address = out['scriptPubKey']['addresses'][0]

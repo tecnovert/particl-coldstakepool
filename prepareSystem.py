@@ -269,60 +269,64 @@ def main():
         except Exception:
             time.sleep(0.5)
 
+    try:
 
-    if mode == 'observer':
-        print('Preparing observer config.')
+        if mode == 'observer':
+            print('Preparing observer config.')
 
-        settings = json.load(urllib.request.urlopen(configurl))
+            settings = json.load(urllib.request.urlopen(configurl))
 
-        settings['mode'] = 'observer'
-        settings['particlbindir'] = PARTICL_BINDIR
-        settings['particldatadir'] = dataDir
-        pool_stake_address = settings['pooladdress']
-        pool_reward_address = settings['rewardaddress']
+            settings['mode'] = 'observer'
+            settings['particlbindir'] = PARTICL_BINDIR
+            settings['particldatadir'] = dataDir
+            pool_stake_address = settings['pooladdress']
+            pool_reward_address = settings['rewardaddress']
 
-        v = callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'validateaddress "%s"' % (pool_stake_address))
+            v = callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'validateaddress "%s"' % (pool_stake_address))
+            assert('isvalid' in v)
+            assert(v['isvalid'] == True)
 
-        callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake importaddress "%s"' % (v['address']))
-        callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward importaddress "%s"' % (pool_reward_address))
+            callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake importaddress "%s"' % (v['address']))
+            callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward importaddress "%s"' % (pool_reward_address))
 
+            callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'stop')
+
+            poolConfFile = os.path.join(poolDir, 'stakepool.json')
+            if os.path.exists(poolConfFile):
+                print('Error: %s exists, exiting.' % (poolConfFile))
+                return
+            with open(poolConfFile, 'w') as fp:
+                json.dump(settings, fp, indent=4)
+
+            print('Done.')
+            return 0
+
+
+        # 3. Generate and import a recovery phrase for both wallets.
+        if stake_wallet_mnemonic is None:
+            stake_wallet_mnemonic = callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'mnemonic new')['mnemonic']
+
+        if reward_wallet_mnemonic is None:
+            reward_wallet_mnemonic = callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'mnemonic new')['mnemonic']
+
+        callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake extkeyimportmaster "%s"' % (stake_wallet_mnemonic))
+        callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward extkeyimportmaster "%s"' % (reward_wallet_mnemonic))
+
+        # 4. Generate the pool_stake_address from the staking wallet.
+        pool_stake_address = callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake getnewaddress')
+        pool_stake_address = callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake validateaddress %s true' % (pool_stake_address))['stakeonly_address']
+
+        # 5. Generate the pool_reward_address from the reward wallet.
+        pool_reward_address = callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward getnewaddress')
+
+        # 6. Disable staking on the reward wallet.
+        callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward walletsettings stakingoptions "{\\"enabled\\":\\"false\\"}"')
+
+        # 7. Set the reward address of the staking wallet.
+        callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake walletsettings stakingoptions "{\\"rewardaddress\\":\\"%s\\"}"' % (pool_reward_address))
+
+    finally:
         callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'stop')
-
-        poolConfFile = os.path.join(poolDir, 'stakepool.json')
-        if os.path.exists(poolConfFile):
-            print('Error: %s exists, exiting.' % (poolConfFile))
-            return
-        with open(poolConfFile, 'w') as fp:
-            json.dump(settings, fp, indent=4)
-
-        print('Done.')
-        return 0
-
-
-    # 3. Generate and import a recovery phrase for both wallets.
-    if stake_wallet_mnemonic is None:
-        stake_wallet_mnemonic = callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'mnemonic new')['mnemonic']
-
-    if reward_wallet_mnemonic is None:
-        reward_wallet_mnemonic = callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'mnemonic new')['mnemonic']
-
-    callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake extkeyimportmaster "%s"' % (stake_wallet_mnemonic))
-    callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward extkeyimportmaster "%s"' % (reward_wallet_mnemonic))
-
-    # 4. Generate the pool_stake_address from the staking wallet.
-    pool_stake_address = callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake getnewaddress')
-    pool_stake_address = callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake validateaddress %s true' % (pool_stake_address))['stakeonly_address']
-
-    # 5. Generate the pool_reward_address from the reward wallet.
-    pool_reward_address = callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward getnewaddress')
-
-    # 6. Disable staking on the reward wallet.
-    callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward walletsettings stakingoptions "{\\"enabled\\":\\"false\\"}"')
-
-    # 7. Set the reward address of the staking wallet.
-    callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake walletsettings stakingoptions "{\\"rewardaddress\\":\\"%s\\"}"' % (pool_reward_address))
-
-    callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'stop')
 
     # 8. Create the stakepool.json configuration file.
     html_port = 9000 if chain == 'mainnet' else 9001
