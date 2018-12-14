@@ -796,7 +796,7 @@ class StakePool():
         try:
             walletinfo = callrpc(self.rpc_port, self.rpc_auth, 'getwalletinfo', [], 'pool_stake')
             rv['watchonlytotalbalance'] = walletinfo['watchonly_total_balance']
-            rv['stakedbalance'] = walletinfo['staked_balance']
+            rv['stakedbalance'] = walletinfo['watchonly_staked_balance']
         except Exception:
             rv['watchonlytotalbalance'] = 0
             rv['stakedbalance'] = 0
