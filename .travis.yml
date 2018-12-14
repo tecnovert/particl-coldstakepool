@@ -1,0 +1,26 @@
+dist: trusty
+os: linux
+language: python
+python: '3.6'
+stages:
+  - lint
+env:
+script:
+  - python3 test_prepareSystem.py
+after_success:
+        - echo "End test"
+jobs:
+  include:
+# lint stage
+    - stage: lint
+      env:
+      cache: false
+      language: python
+      python: '3.6'
+      install:
+        - travis_retry pip install flake8==3.5.0
+      before_script:
+      script:
+        - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F405,F403,F841
+      after_success:
+        - echo "End lint"

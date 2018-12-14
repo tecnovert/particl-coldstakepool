@@ -76,6 +76,8 @@ def format16(i):
 
 
 mxLog = threading.Lock()
+
+
 def logm(fp, s, tag='', printstd=True, writetofile=WRITE_TO_LOG_FILE):
     mxLog.acquire()
     try:
@@ -94,6 +96,8 @@ def logmt(fp, s, printstd=True, writetofile=WRITE_TO_LOG_FILE):
 
 
 mxDB = threading.Lock()
+
+
 def getDBMutex(method):
     @wraps(method)
     def _impl(self, *method_args, **method_kwargs):
@@ -276,7 +280,7 @@ class StakePool():
         self.setParameters(height)
 
         if 'coinstake' not in reward:
-            #logm('No coinstake txn found in block ' + str(height))
+            # logm('No coinstake txn found in block ' + str(height))
             db.put(bytes([DBT_DATA]) + b'current_height', struct.pack('>i', height))
             db.close()
             self.poolHeight = height
@@ -353,8 +357,6 @@ class StakePool():
         # Coin paid to the pool participants
         poolRewardClients = int(blockReward - (poolReward + stakeBonus))
 
-        #addrsToPay = []
-
         b.put(bytes([DBT_DATA]) + b'current_height', struct.pack('>i', height))
         b.put(bytes([DBT_POOL_BLOCK]) + struct.pack('>i', height), bytes.fromhex(reward['blockhash']) + blockReward.to_bytes(8, 'big') + poolCoinTotal.to_bytes(8, 'big'))
 
@@ -384,7 +386,7 @@ class StakePool():
 
             assignedStakeBonus = 0
             if stakeBonus > 0 and k == reward['kernelscript']['spendaddr']:
-                #if self.debug:
+                # if self.debug:
                 #    logm(self.fp, 'Assigning stake bonus to %s %s\n' % (k, format8(stakeBonus)))
                 addrTotal += int(stakeBonus * COIN)
                 assignedStakeBonus = stakeBonus
@@ -399,9 +401,6 @@ class StakePool():
                 addrPending = 0
                 addrPaidout = 0
                 self.setBalance(dbkey, addrTotal.to_bytes(16, 'big') + addrPending.to_bytes(8, 'big') + addrPaidout.to_bytes(8, 'big') + v.to_bytes(8, 'big'), b, batchBalances)
-
-            #if (addrTotal // COIN) > self.payoutThreshold:
-            #    addrsToPay.append(k)
 
             if self.debug:
                 with open(os.path.join(self.debugDir, k + '.csv'), 'a') as fp:
@@ -500,7 +499,6 @@ class StakePool():
             if self.tx_fee_per_kb is not None:
                 opts['feeRate'] = self.tx_fee_per_kb
 
-            #ro = callrpc_cli(self.binDir, self.particlDataDir, self.chain, '-rpcwallet=pool_reward sendtypeto part part "%s" "" "" 4 64 true "%s"' % (dumpje(sl), dumpje(opts)))
             ro = callrpc(self.rpc_port, self.rpc_auth, 'sendtypeto',
                          ['part', 'part', sl, '', '', 4, 64, False, opts], 'pool_reward')
 
@@ -545,7 +543,7 @@ class StakePool():
                             ))
 
     def findPayments(self, height, coinstakeid, db, b, batchBalances):
-        #logm(self.fp, 'findPayments')
+        # logm(self.fp, 'findPayments')
         opts = {
             'addresses': [self.poolAddrReward],
             'start': height,
@@ -1056,6 +1054,8 @@ class HttpThread(threading.Thread, HTTPServer):
 
 is_running = True
 fail_code = 0
+
+
 def stopRunning(with_code=0):
     global is_running
     global fail_code

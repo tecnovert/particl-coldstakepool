@@ -15,6 +15,7 @@ import segwit_addr
 import hashlib
 from xmlrpc.client import *
 
+
 def toBool(s):
     return s.lower() in ["1", "true"]
 
@@ -37,8 +38,8 @@ def dumpje(jin):
     return json.dumps(jin, default=jsonDecimal).replace('"', '\\"')
 
 
-__b58chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 def b58decode(v, length=None):
+    __b58chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
     long_value = 0
     for (i, c) in enumerate(v[::-1]):
         ofs = __b58chars.find(c)
@@ -158,14 +159,12 @@ class Jsonrpc():
             }
 
             connection.putrequest("POST", self.__handler)
-            #headers.append(("Content-Type", "text/plain"))
             headers.append(("Content-Type", "application/json"))
             headers.append(("User-Agent", 'jsonrpc'))
             self.__transport.send_headers(connection, headers)
             self.__transport.send_content(connection, json.dumps(request_body, default=jsonDecimal).encode('utf-8'))
 
             resp = connection.getresponse()
-            #if resp.status == 200:
             return resp.read()
 
         except Fault:
@@ -211,7 +210,6 @@ def callrpc(rpc_port, auth, method, params=[], wallet=None):
 
 
 def callrpc_cli(bindir, datadir, chain, cmd):
-    #command_cli = os.path.join(bindir, PARTICL_CLI)
     command_cli = os.path.join(bindir, 'particl-cli')
 
     args = command_cli + ('' if chain == 'mainnet' else ' -' + chain) + ' -datadir=' + datadir + ' ' + cmd

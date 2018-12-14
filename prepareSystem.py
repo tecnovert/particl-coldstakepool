@@ -142,9 +142,9 @@ def downloadParticlCore():
     bin_path = os.path.join(PARTICL_BINDIR, 'particl-%s/bin/*' % (PARTICL_VERSION))
     subprocess.check_call(['cp ' + bin_path + ' ' + PARTICL_BINDIR], shell=True)
 
-    output = subprocess.check_output([os.path.join(PARTICL_BINDIR, 'particld') + ' --version'], shell=True)
+    output = subprocess.check_output([daemon_path + ' --version'], shell=True)
     version = output.splitlines()[0].decode('utf-8')
-    print('particld --version\n'+version)
+    print('particld --version\n' + version)
     assert(PARTICL_VERSION in version)
 
 
@@ -284,7 +284,7 @@ def main():
 
             v = callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'validateaddress "%s"' % (pool_stake_address))
             assert('isvalid' in v)
-            assert(v['isvalid'] == True)
+            assert(v['isvalid'] is True)
 
             callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake importaddress "%s"' % (v['address']))
             callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward importaddress "%s"' % (pool_reward_address))
@@ -300,7 +300,6 @@ def main():
 
             print('Done.')
             return 0
-
 
         # 3. Generate and import a recovery phrase for both wallets.
         if stake_wallet_mnemonic is None:

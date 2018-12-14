@@ -30,7 +30,6 @@ class Test(unittest.TestCase):
                     prepareSystem.main()
 
         self.assertEqual(cm.exception.code, 1)
-        #logging.getLogger().info('fo'+fake_out.getvalue())
         self.assertTrue('observer mode requires configurl' in fake_out.getvalue())
 
 
