@@ -1,6 +1,8 @@
 
 # Particl Cold-Staking Pool - Proof of concept
 
+[![Build Status](https://travis-ci.org/particl/coldstakepool.svg?branch=master)](https://travis-ci.org/particl/coldstakepool)
+
 ## Overview
 
 Pool participants send their coin to a coldstake script with a stake

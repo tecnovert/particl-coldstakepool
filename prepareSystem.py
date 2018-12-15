@@ -270,7 +270,6 @@ def main():
             time.sleep(0.5)
 
     try:
-
         if mode == 'observer':
             print('Preparing observer config.')
 

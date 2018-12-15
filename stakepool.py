@@ -33,7 +33,8 @@ import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import http.client
 from functools import wraps
-from util import *
+sys.path.insert(0, os.path.dirname(__file__))
+from util import *  # noqa: E402
 
 DEBUG = True
 ALLOW_CORS = True
@@ -866,16 +867,18 @@ class HttpHandler(BaseHTTPRequestHandler):
             return self.js_error(str(e))
 
     def page_config(self, urlSplit):
-        settingsPath = os.path.join(self.server.stakePool.dataDir, 'stakepool.json')
+        settings_path = os.path.join(self.server.stakePool.dataDir, 'stakepool.json')
 
-        if not os.path.exists(settingsPath):
+        if not os.path.exists(settings_path):
             return self.page_error('Settings file not found.')
 
-        with open(settingsPath) as fs:
-            return bytes(fs.read(), 'UTF-8')
+        with open(settings_path) as fs:
+            settings = json.load(fs)
+        settings['particlbindir'] = '...'
+        settings['particldatadir'] = '...'
+        return bytes(json.dumps(settings, indent=4), 'UTF-8')
 
     def page_address(self, urlSplit):
-
         if len(urlSplit) < 3:
             return self.page_error('Must specify address')
 
@@ -980,7 +983,6 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def handle_http(self, status_code, path):
-
         urlSplit = self.path.split('/')
         if len(urlSplit) > 1:
             if urlSplit[1] == 'address':
@@ -1069,13 +1071,12 @@ def signal_handler(sig, frame):
 
 
 def runStakePool(fp, dataDir, chain):
+    settings_path = os.path.join(dataDir, 'stakepool.json')
 
-    settingsPath = os.path.join(dataDir, 'stakepool.json')
+    if not os.path.exists(settings_path):
+        raise ValueError('Settings file not found: ' + str(settings_path))
 
-    if not os.path.exists(settingsPath):
-        raise ValueError('Settings file not found: ' + str(settingsPath))
-
-    with open(settingsPath) as fs:
+    with open(settings_path) as fs:
         settings = json.load(fs)
 
     stakePool = StakePool(fp, dataDir, settings, chain)

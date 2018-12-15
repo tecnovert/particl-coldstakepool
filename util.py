@@ -5,15 +5,16 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-
+import sys
 import os
 import decimal
 import subprocess
 import json
 import traceback
-import segwit_addr
 import hashlib
 from xmlrpc.client import *
+sys.path.insert(0, os.path.dirname(__file__))
+from segwit_addr import bech32_decode, convertbits, bech32_encode  # noqa: E402
 
 
 def toBool(s):
@@ -38,8 +39,10 @@ def dumpje(jin):
     return json.dumps(jin, default=jsonDecimal).replace('"', '\\"')
 
 
+__b58chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+
+
 def b58decode(v, length=None):
-    __b58chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
     long_value = 0
     for (i, c) in enumerate(v[::-1]):
         ofs = __b58chars.find(c)
@@ -88,17 +91,17 @@ def b58encode(v):
 
 
 def bech32Decode(hrp, addr):
-    hrpgot, data = segwit_addr.bech32_decode(addr)
+    hrpgot, data = bech32_decode(addr)
     if hrpgot != hrp:
         return None
-    decoded = segwit_addr.convertbits(data, 5, 8, False)
+    decoded = convertbits(data, 5, 8, False)
     if decoded is None or len(decoded) < 2 or len(decoded) > 40:
         return None
     return bytes(decoded)
 
 
 def bech32Encode(hrp, data):
-    ret = segwit_addr.bech32_encode(hrp, segwit_addr.convertbits(data, 8, 5))
+    ret = bech32_encode(hrp, convertbits(data, 8, 5))
     if bech32Decode(hrp, ret) is None:
         return None
     return ret
