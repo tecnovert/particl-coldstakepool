@@ -25,5 +25,11 @@
             "height": 1000,
             "poolfeepercent": 5,
         },
-    ]
+    ],
+    "poolownerwithdrawal": {
+        "frequency": 720,
+        "address": "...",
+        "reserve": 2,
+        "threshold": 5
+    }
 }

@@ -52,9 +52,9 @@ from util import *
 import urllib.request
 
 
-PARTICL_BINDIR = os.path.expanduser(os.getenv("PARTICL_BINDIR", "~/particl-binaries"))
-PARTICLD = os.getenv("PARTICLD", "particld")
-PARTICL_CLI = os.getenv("PARTICL_CLI", "particl-cli")
+PARTICL_BINDIR = os.path.expanduser(os.getenv('PARTICL_BINDIR', '~/particl-binaries'))
+PARTICLD = os.getenv('PARTICLD', 'particld')
+PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
 
 PARTICL_VERSION = '0.17.0.3'
 PARTICL_VERSION_TAG = ''
