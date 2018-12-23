@@ -8,7 +8,9 @@
 # $ python3 test_prepareSystem.py -v
 
 import unittest
+import os
 import sys
+import json
 from io import StringIO
 from unittest.mock import patch
 import logging
@@ -31,6 +33,12 @@ class Test(unittest.TestCase):
 
         self.assertEqual(cm.exception.code, 1)
         self.assertTrue('observer mode requires configurl' in fake_out.getvalue())
+
+    def test_example_config(self):
+        settings_path = os.path.join('config', 'stakepool.json')
+
+        with open(settings_path) as fs:
+            settings = json.load(fs)
 
 
 if __name__ == '__main__':

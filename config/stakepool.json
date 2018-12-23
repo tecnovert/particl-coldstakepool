@@ -9,9 +9,9 @@
     "zmqhost": "tcp://127.0.0.1",
     "zmqport": 20792,
     "htmlhost": "",
-    "htmlport": n,
+    "htmlport": 900,
     "allowcors": true,
-    "maxoutputspertx": n,
+    "maxoutputspertx": 64,
     "parameters": [
         {
             "height": 0,
@@ -19,12 +19,12 @@
             "stakebonuspercent": 5,
             "payoutthreshold": 0.1,
             "minblocksbetweenpayments": 100,
-            "minoutputvalue": 0.01,
+            "minoutputvalue": 0.01
         },
         {
             "height": 1000,
-            "poolfeepercent": 5,
-        },
+            "poolfeepercent": 5
+        }
     ],
     "poolownerwithdrawal": {
         "frequency": 720,
