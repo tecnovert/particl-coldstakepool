@@ -633,7 +633,7 @@ class StakePool():
                 totalDisbursed += v
                 if addrPending < 0:
                     logmt(self.fp, 'WARNING: txn %s overpays address %s more than pending payout, pending: %d, paid: %d.\n' % (txid, address, addrPending + v, v), True, True)
-                    if addrReward + addrPending < 0:
+                    if addrReward + (addrPending * COIN) < 0:
                         logmt(self.fp, 'WARNING: txn %s overpays address %s more than accumulated reward %d, paid: %d.\n' % (txid, address, addrPending + v, v), True, True)
                     else:
                         # Reduce accumulated reward by amount overpaid

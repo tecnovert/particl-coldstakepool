@@ -50,9 +50,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         stakePool = self.server.stakePool
         if len(urlSplit) > 3:
             code_str = urlSplit[3]
-            salt = 'ajf8923ol2xcv.'
-            hashed = hashlib.sha256(str(code_str + salt).encode('utf-8')).hexdigest()
-            if not hashed == 'fd5816650227b75143e60c61b19e113f43f5dcb57e2aa5b6161a50973f2033df':
+            hashed = hashlib.sha256(str(code_str + self.management_key_salt).encode('utf-8')).hexdigest()
+            if not hashed == self.management_key_hash:
                 return self.js_error('Unknown argument')
             try:
                 return bytes(json.dumps(stakePool.rebuildMetrics()), 'UTF-8')
@@ -80,6 +79,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         settings['particlbindir'] = '...'
         settings['particldatadir'] = '...'
         settings['poolownerwithdrawal'] = '...'
+        settings.pop('management_key_salt', None)
+        settings.pop('management_key_hash', None)
         return bytes(json.dumps(settings, indent=4), 'UTF-8')
 
     def page_address(self, urlSplit):
@@ -225,7 +226,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
 
 class HttpThread(threading.Thread, HTTPServer):
-    def __init__(self, fp, hostName, portNo, allow_cors, stakePool):
+    def __init__(self, fp, hostName, portNo, allow_cors, stakePool, key_salt=None, key_hash=None):
         threading.Thread.__init__(self)
 
         self.stop_event = threading.Event()
@@ -234,6 +235,8 @@ class HttpThread(threading.Thread, HTTPServer):
         self.portNo = portNo
         self.allow_cors = allow_cors
         self.stakePool = stakePool
+        self.management_key_salt = 'ajf8923ol2xcv.' if key_salt is None else key_salt
+        self.management_key_hash = 'fd5816650227b75143e60c61b19e113f43f5dcb57e2aa5b6161a50973f2033df' if key_hash is None else key_hash
 
         self.timeout = 60
         HTTPServer.__init__(self, (self.hostName, self.portNo), HttpHandler)
