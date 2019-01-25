@@ -86,6 +86,7 @@ def printHelp():
     print('Usage: prepareSystem.py ')
     print('\n--update_core              Download Particl core release and exit.')
     print('\n--datadir=PATH             Path to Particl data directory, default:~/.particl.')
+    print('\n--pooldir=PATH             Path to stakepool data directory, default:{datadir}/stakepool.')
     print('\n--testnet                  Run Particl in testnet mode.')
     print('\n--mainnet                  Run Particl in mainnet mode.')
     print('\n--stake_wallet_mnemonic=   Recovery phrase to use for the staking wallet, default is randomly generated.')
@@ -187,6 +188,9 @@ def main():
         if len(s) == 2:
             if name == 'datadir':
                 dataDir = os.path.expanduser(s[1])
+                continue
+            if name == 'pooldir':
+                poolDir = os.path.expanduser(s[1])
                 continue
             if name == 'stake_wallet_mnemonic':
                 stake_wallet_mnemonic = s[1]

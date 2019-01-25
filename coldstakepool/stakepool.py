@@ -450,11 +450,6 @@ class StakePool():
 
         b.put(bytes([DBT_DATA]) + b'last_payment_run', struct.pack('>i', height))
 
-        ro = callrpc(self.rpc_port, self.rpc_auth, 'getblockchaininfo')
-        if ro['blocks'] >= self.poolHeight + self.blockBuffer + 5:
-            logmt(self.fp, 'Warning: Pool height is below node height, skipping disbursement, %d, %d.\n' % (self.poolHeight, ro['blocks']))
-            return
-
         totalDisbursed = 0
         txns = []
         outputs = []
@@ -481,6 +476,12 @@ class StakePool():
             return
 
         if self.mode != 'master':
+            return
+
+        # Safety check to prevent double paying if resyncing the chain in master mode
+        ro = callrpc(self.rpc_port, self.rpc_auth, 'getblockchaininfo')
+        if ro['blocks'] >= self.poolHeight + self.blockBuffer + 5:
+            logmt(self.fp, 'Warning: Pool height is below node height, skipping disbursement, %d, %d.\n' % (self.poolHeight, ro['blocks']))
             return
 
         txfees = 0
@@ -635,7 +636,8 @@ class StakePool():
                     if addrReward + addrPending < 0:
                         logmt(self.fp, 'WARNING: txn %s overpays address %s more than accumulated reward %d, paid: %d.\n' % (txid, address, addrPending + v, v), True, True)
                     else:
-                        addrReward += addrPending
+                        # Reduce accumulated reward by amount overpaid
+                        addrReward += addrPending * COIN
                     addrPending = 0
 
                 self.setBalance(dbkey, addrReward.to_bytes(16, 'big') + addrPending.to_bytes(8, 'big') + addrPaidout.to_bytes(8, 'big') + n[32:], b, batchBalances)
