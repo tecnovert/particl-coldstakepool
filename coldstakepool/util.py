@@ -1,20 +1,66 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 The Particl Core developers
+# Copyright (c) 2018-2019 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
-import sys
 import os
+import time
 import decimal
 import subprocess
 import json
 import traceback
 import hashlib
-from xmlrpc.client import *
-sys.path.insert(0, os.path.dirname(__file__))
-from segwit_addr import bech32_decode, convertbits, bech32_encode  # noqa: E402
+import urllib
+import threading
+from xmlrpc.client import (
+    Transport,
+    Fault,
+)
+from .segwit_addr import bech32_decode, convertbits, bech32_encode
+
+
+WRITE_TO_LOG_FILE = True
+COIN = 100000000
+mxLog = threading.Lock()
+
+
+def logm(fp, s, tag='', printstd=True, writetofile=WRITE_TO_LOG_FILE):
+    mxLog.acquire()
+    try:
+        if printstd:
+            print(s)
+
+        if writetofile:
+            fp.write(tag + s + '\n')
+            fp.flush()
+    finally:
+        mxLog.release()
+
+
+def logmt(fp, s, printstd=True, writetofile=WRITE_TO_LOG_FILE):
+    logm(fp, time.strftime('%y-%m-%d_%H-%M-%S', time.localtime()) + '\t' + s, printstd=printstd, writetofile=writetofile)
+
+
+def format8(i):
+    n = abs(i)
+    quotient = n // COIN
+    remainder = n % COIN
+    rv = "%d.%08d" % (quotient, remainder)
+    if i < 0:
+        rv = '-' + rv
+    return rv
+
+
+def format16(i):
+    n = abs(i)
+    quotient = n // (COIN * COIN)
+    remainder = n % (COIN * COIN)
+    rv = "%d.%016d" % (quotient, remainder)
+    if i < 0:
+        rv = '-' + rv
+    return rv
 
 
 def toBool(s):

@@ -12,12 +12,12 @@ The pool can only stake such outputs, participants can withdraw their
 coin without interacting with the pool.
 
 
-A pool-fee is deducted from each block staked by the pool. This fee
-should cover the costs of running the pool as well as the transaction
-fees of the payouts.
+A pool-fee is deducted from the reward of each block staked by the pool.
+This fee should cover the costs of running the pool as well as the
+transaction fees of the payouts.
 
-An optional stake bonus can be deducted from the block reward to be
-assigned to the spend script of the staked output.
+An optional stake bonus can deducted and assigned to the address of the
+output which staked the block.
 
 The remaining block reward is accumulated to the pool participants
 spend scripts in proportion to the amount of coin each spend script has

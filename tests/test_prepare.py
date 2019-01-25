@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 The Particl Core developers
+# Copyright (c) 2018-2019 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
-# $ python3 test_prepareSystem.py -v
+# coldstakepool]$ python setup.py test
 
-import unittest
 import os
 import sys
+import unittest
 import json
 from io import StringIO
 from unittest.mock import patch
 import logging
 
-import prepareSystem
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../bin')))
+import coldstakepool_prepare as prepareSystem  # noqa: E402
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -35,7 +36,7 @@ class Test(unittest.TestCase):
         self.assertTrue('observer mode requires configurl' in fake_out.getvalue())
 
     def test_example_config(self):
-        settings_path = os.path.join('config', 'stakepool.json')
+        settings_path = os.path.join(os.path.dirname(__file__), '..', 'doc', 'config', 'stakepool.json')
 
         with open(settings_path) as fs:
             settings = json.load(fs)

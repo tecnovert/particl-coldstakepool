@@ -1,11 +1,11 @@
 
 [Unit]
-Description=Particl stakepool testnet
-After=particld_test.service
-Requires=particld_test.service
+Description=Particl stakepool mainnet
+After=particld_live.service
+Requires=particld_live.service
 
 [Service]
-ExecStart=/usr/bin/python3 /home/stakepooluser/stakepool/stakepool.py -datadir=~/stakepoolDemoTest/stakepool -testnet
+ExecStart=coldstakepool-run -datadir=~/stakepoolDemoLive/stakepool
 TimeoutStopSec=30
 
 User=stakepooluser

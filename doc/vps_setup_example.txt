@@ -4,31 +4,35 @@ This example should be run as a user named stakepooluser.
 To run as a different user replace all instances of 'stakepooluser' with your
 username both in this guide and in the .service files in the config directory.
 eg:
-sed -i -- 's/stakepooluser/YOURUSERNAME/g' stakepool/config/*.service
+sed -i -- 's/stakepooluser/YOURUSERNAME/g' config/*.service
 
 
 First login to your VPS, replace stakepoolvps with the correct ip address:
 $ ssh stakepooluser@stakepoolvps
 
-$ sudo apt-get install gnupg wget python3 git nginx tmux python3-zmq python3-pip lynx htop
-$ pip3 install plyvel
+$ sudo apt-get update
+$ sudo apt-get install gnupg wget python3 git nginx tmux python3-zmq python3-pip lynx htop vim
 
-$ git clone https://github.com/particl/coldstakepool stakepool
+$ git clone https://github.com/particl/coldstakepool particl_stakepool
+
+$ cd particl_stakepool
+$ sudo pip3 install .
 
 
 -- Testnet
 
-$ python3 ~/stakepool/prepareSystem.py -datadir=~/stakepoolDemoTest -testnet
-NOTE: Save both the recovery phrases:
+$ coldstakepool-prepare -datadir=~/stakepoolDemoTest -testnet
+NOTE: Save both recovery phrases:
 Stake wallet recovery phrase: ...
 Reward wallet recovery phrase: ...
 Stake address: tpcs1mwk4e0z4ll8p6n6wl0hm8l9slyf2vcgjatzwxh
 Reward address: poiXfkxxB5eeEgvL3MZN1pxPq9Bfwh7tEm
 
-$ vi stakepoolDemoTest/stakepool/stakepool.json
-Adjust the startheight parameter.
+$ vi ~/stakepoolDemoTest/stakepool/stakepool.json
+Adjust the startheight parameter to a block before the pool began
+operating.  Earlier blocks won't be scanned by the pool.
 
-$ sudo cp stakepool/config/*.service /etc/systemd/system
+$ sudo cp doc/config/*.service /etc/systemd/system
 $ sudo systemctl daemon-reload
 
 
@@ -44,18 +48,18 @@ $ lynx localhost:9001
 
 -- Mainnet
 
-$ python3 ~/stakepool/prepareSystem.py -datadir=~/stakepoolDemoLive
+$ coldstakepool-prepare -datadir=~/stakepoolDemoLive
 NOTE: Save both the recovery phrases:
 Stake wallet recovery phrase: ...
 Reward wallet recovery phrase: ...
 Stake address: pcs14ch7w7ue2q8kadljsl42wehfw8tm99yxsez4kz
 Reward address: PbXgDsRurjpCYXxNryin13h86ufks9zh6o
 
-$ vi stakepoolDemoLive/stakepool/stakepool.json
+$ vi ~/stakepoolDemoLive/stakepool/stakepool.json
 Adjust the startheight parameter.
 
 
-$ sudo cp stakepool/config/*.service /etc/systemd/system
+$ sudo cp doc/config/*.service /etc/systemd/system
 $ sudo systemctl daemon-reload
 
 
@@ -64,12 +68,12 @@ $ sudo systemctl enable particld_live.service stakepool_live.service
 
 Test:
 $ sudo tail -f /var/log/syslog
-$ ./particl-binaries/particl-cli -datadir=/home/stakepooluser/stakepoolDemoLive getblockchaininfo
+$ ~/particl-binaries/particl-cli -datadir=/home/stakepooluser/stakepoolDemoLive getblockchaininfo
 $ lynx localhost:9000
 
 
 $ sudo rm /etc/nginx/sites-enabled/default
-$ sudo cp stakepool/config/nginx_stakepool_forward.conf /etc/nginx/conf.d/
+$ sudo cp doc/config/nginx_stakepool_forward.conf /etc/nginx/conf.d/
 
 $ sudo nginx -t
 
@@ -93,8 +97,8 @@ The production configuration enables:
 * HTTPS / TLS support
 
 $ mkdir /tmp/nginx
-$ sudo rm stakepool/config/nginx_stakepool_forward.conf
-$ sudo cp stakepool/config/nginx_stakepool_production.conf /etc/nginx/conf.d/
+$ sudo rm /etc/nginx/conf.d/nginx_stakepool_forward.conf
+$ sudo cp doc/config/nginx_stakepool_production.conf /etc/nginx/conf.d/
 $ sudo systemctl restart nginx
 
 Test, browse to:

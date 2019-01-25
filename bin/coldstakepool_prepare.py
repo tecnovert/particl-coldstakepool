@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 The Particl Core developers
+# Copyright (c) 2018-2019 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
 """
 
@@ -30,13 +30,13 @@ Install dependecies:
 apt-get install wget gnupg
 
 Run the prepare script:
-python3 prepareSystem.py -datadir=~/stakepoolDemoTest -testnet
+coldstakepool-prepare.py -datadir=~/stakepoolDemoTest -testnet
 
 Start the daemon:
 ~/particl-binaries/particld -datadir=/home/$(id -u -n)/stakepoolDemoTest
 
 Start the pool script:
-python3 stakepool.py -datadir=~/stakepoolDemoTest/stakepool -testnet
+coldstakepool-run.py -datadir=~/stakepoolDemoTest/stakepool -testnet
 
 
 """
@@ -48,15 +48,17 @@ import time
 import json
 import hashlib
 import mmap
-from util import *
 import urllib.request
+from coldstakepool.util import (
+    callrpc_cli,
+)
 
 
 PARTICL_BINDIR = os.path.expanduser(os.getenv('PARTICL_BINDIR', '~/particl-binaries'))
 PARTICLD = os.getenv('PARTICLD', 'particld')
 PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
 
-PARTICL_VERSION = '0.17.0.3'
+PARTICL_VERSION = '0.17.1.0'
 PARTICL_VERSION_TAG = ''
 
 
@@ -140,7 +142,7 @@ def downloadParticlCore():
     daemon_path = os.path.join(PARTICL_BINDIR, PARTICLD)
     subprocess.check_call(['tar', '-xvf', packed_path, '-C', PARTICL_BINDIR])
     bin_path = os.path.join(PARTICL_BINDIR, 'particl-%s/bin/*' % (PARTICL_VERSION))
-    subprocess.check_call(['cp ' + bin_path + ' ' + PARTICL_BINDIR], shell=True)
+    subprocess.check_call(['cp ' + bin_path + ' ' + PARTICL_BINDIR], shell=True)  # Will fail if particld is running
 
     output = subprocess.check_output([daemon_path + ' --version'], shell=True)
     version = output.splitlines()[0].decode('utf-8')
