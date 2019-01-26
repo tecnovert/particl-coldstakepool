@@ -82,19 +82,6 @@ class AppPrepare():
         self.app_name = self.get_app_name(self.name)
 
 
-def printHelp():
-    print('Usage: prepareSystem.py ')
-    print('\n--update_core              Download Particl core release and exit.')
-    print('\n--datadir=PATH             Path to Particl data directory, default:~/.particl.')
-    print('\n--pooldir=PATH             Path to stakepool data directory, default:{datadir}/stakepool.')
-    print('\n--testnet                  Run Particl in testnet mode.')
-    print('\n--mainnet                  Run Particl in mainnet mode.')
-    print('\n--stake_wallet_mnemonic=   Recovery phrase to use for the staking wallet, default is randomly generated.')
-    print('\n--reward_wallet_mnemonic=  Recovery phrase to use for the reward wallet, default is randomly generated.')
-    print('\n--mode=master/observer     Mode stakepool is initialised to. observer mode requires configurl to be specified, default:master.')
-    print('\n--configurl=url            Url to pull the stakepool config file from when initialising for observer mode.')
-
-
 def downloadParticlCore():
     print('Download and verify Particl core release.')
 
@@ -151,6 +138,24 @@ def downloadParticlCore():
     assert(PARTICL_VERSION in version)
 
 
+def printVersion():
+    from coldstakepool import __version__
+    print('Particl coldstakepool version:', __version__)
+
+
+def printHelp():
+    print('Usage: prepareSystem.py ')
+    print('\n--update_core              Download Particl core release and exit.')
+    print('\n--datadir=PATH             Path to Particl data directory, default:~/.particl.')
+    print('\n--pooldir=PATH             Path to stakepool data directory, default:{datadir}/stakepool.')
+    print('\n--testnet                  Run Particl in testnet mode.')
+    print('\n--mainnet                  Run Particl in mainnet mode.')
+    print('\n--stake_wallet_mnemonic=   Recovery phrase to use for the staking wallet, default is randomly generated.')
+    print('\n--reward_wallet_mnemonic=  Recovery phrase to use for the reward wallet, default is randomly generated.')
+    print('\n--mode=master/observer     Mode stakepool is initialised to. observer mode requires configurl to be specified, default:master.')
+    print('\n--configurl=url            Url to pull the stakepool config file from when initialising for observer mode.')
+
+
 def main():
     dataDir = None
     poolDir = None
@@ -172,6 +177,9 @@ def main():
             if name[0] == '-':
                 name = name[1:]
 
+        if name == 'v' or name == 'version':
+            printVersion()
+            return 0
         if name == 'h' or name == 'help':
             printHelp()
             return 0

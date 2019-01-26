@@ -24,6 +24,7 @@ import json
 import traceback
 import signal
 
+from coldstakepool import __version__
 from coldstakepool.stakepool import StakePool
 from coldstakepool.http_server import HttpThread
 from coldstakepool.util import (
@@ -82,6 +83,10 @@ def runStakePool(fp, dataDir, chain):
         t.join()
 
 
+def printVersion():
+    print('Particl coldstakepool version:', __version__)
+
+
 def printHelp():
     print('coldstakepool-run.py --datadir=path -testnet')
 
@@ -102,6 +107,9 @@ def main():
             if name[0] == '-':
                 name = name[1:]
 
+        if name == 'v' or name == 'version':
+            printVersion()
+            return 0
         if name == 'h' or name == 'help':
             printHelp()
             return 0
@@ -134,7 +142,7 @@ def main():
         os.makedirs(dataDir)
 
     with open(os.path.join(dataDir, 'stakepool_log.txt'), 'w') as fp:
-        logmt(fp, os.path.basename(sys.argv[0]) + '\n\n')
+        logmt(fp, os.path.basename(sys.argv[0]) + ', version: ' + __version__ + '\n\n')
         runStakePool(fp, dataDir, chain)
 
     print('Done.')

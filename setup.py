@@ -1,8 +1,14 @@
 import setuptools
+import re, io
+
+__version__ = re.search(
+    r'__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
+    io.open('coldstakepool/__init__.py', encoding='utf_8_sig').read()
+    ).group(1)
 
 setuptools.setup(
     name="coldstakepool",
-    version="0.0.1",
+    version=__version__,
     author="The Particl Developers",
     author_email="hello@particl.io",
     description="Particl cold-staking pool",
