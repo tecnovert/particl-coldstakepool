@@ -1,7 +1,10 @@
-dist: trusty
+dist: xenial
 os: linux
 language: python
 python: '3.6'
+cache:
+  directories:
+    - $HOME/particl-binaries
 stages:
   - lint
 env:
@@ -17,10 +20,14 @@ jobs:
       cache: false
       language: python
       python: '3.6'
+      before_install:
+        - sudo apt-get install -y wget gnupg
       install:
         - travis_retry pip install flake8==3.5.0
+        - travis_retry pip install codespell==1.13.0
       before_script:
       script:
         - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841
+        - codespell --check-filenames --disable-colors --quiet-level=7
       after_success:
         - echo "End lint"

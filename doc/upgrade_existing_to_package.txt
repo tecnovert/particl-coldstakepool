@@ -42,7 +42,7 @@ Verify:
 $ systemctl status stakepool_live.service
 Active: active (running)
 
-$ tail ~/stakepoolDemoLive/stakepool/stakepool_log.txt
+$ tail -n100 ~/stakepoolDemoLive/stakepool/stakepool_log.txt | grep coldstakepool
 coldstakepool-run, version: 0.0.1
 
 

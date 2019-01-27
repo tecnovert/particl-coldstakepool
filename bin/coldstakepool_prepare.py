@@ -26,7 +26,7 @@ Minimal example of starting a Particl stake pool.
 8. Create the stakepool.json configuration file.
 
 
-Install dependecies:
+Install dependencies:
 apt-get install wget gnupg
 
 Run the prepare script:
@@ -108,7 +108,7 @@ def downloadParticlCore():
     print('Release hash:', release_hash.hex())
     with open(assert_path, 'rb', 0) as fp, mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ) as s:
         if s.find(bytes(release_hash.hex(), 'utf-8')) == -1:
-            print('Error: release hash %s not found in assert file.' % (release_hash.hex()))
+            sys.stderr.write('Error: release hash %s not found in assert file.' % (release_hash.hex()))
             exit(1)
         else:
             print('Found release hash %s in assert file.' % (release_hash.hex()))
@@ -124,7 +124,7 @@ def downloadParticlCore():
     try:
         subprocess.check_call(['gpg', '--verify', sig_path, assert_path])
     except Exception:
-        print('Error: Signature verification failed!')
+        sys.stderr.write('Error: Signature verification failed!')
         exit(1)
 
     daemon_path = os.path.join(PARTICL_BINDIR, PARTICLD)
@@ -148,8 +148,9 @@ def printHelp():
     print('\n--update_core              Download Particl core release and exit.')
     print('\n--datadir=PATH             Path to Particl data directory, default:~/.particl.')
     print('\n--pooldir=PATH             Path to stakepool data directory, default:{datadir}/stakepool.')
-    print('\n--testnet                  Run Particl in testnet mode.')
     print('\n--mainnet                  Run Particl in mainnet mode.')
+    print('\n--testnet                  Run Particl in testnet mode.')
+    print('\n--regtest                  Run Particl in regtest mode.')
     print('\n--stake_wallet_mnemonic=   Recovery phrase to use for the staking wallet, default is randomly generated.')
     print('\n--reward_wallet_mnemonic=  Recovery phrase to use for the reward wallet, default is randomly generated.')
     print('\n--mode=master/observer     Mode stakepool is initialised to. observer mode requires configurl to be specified, default:master.')
@@ -186,6 +187,8 @@ def main():
         if name == 'update_core':
             downloadParticlCore()
             return 0
+        if name == 'mainnet':
+            continue
         if name == 'testnet':
             chain = 'testnet'
             continue
@@ -209,7 +212,7 @@ def main():
             if name == 'mode':
                 mode = s[1]
                 if mode != 'master' and mode != 'observer':
-                    print('Unknown value for mode:', mode)
+                    sys.stderr.write('Unknown value for mode:' + mode)
                     exit(1)
                 continue
             if name == 'configurl':
@@ -253,8 +256,8 @@ def main():
     # 2. Create a particl.conf
     daemonConfFile = os.path.join(dataDir, 'particl.conf')
     if os.path.exists(daemonConfFile):
-        print('Error: %s exists, exiting.' % (daemonConfFile))
-        return
+        sys.stderr.write('Error: %s exists, exiting.' % (daemonConfFile))
+        exit(1)
 
     zmq_port = 207922 if chain == 'mainnet' else 208922
     with open(daemonConfFile, 'w') as fp:
@@ -263,12 +266,9 @@ def main():
 
         fp.write('zmqpubhashblock=tcp://127.0.0.1:%d\n' % (zmq_port))
 
-        if chain == 'testnet':
-            fp.write('test.wallet=pool_stake\n')
-            fp.write('test.wallet=pool_reward\n')
-        else:
-            fp.write('wallet=pool_stake\n')
-            fp.write('wallet=pool_reward\n')
+        chain_id = 'test.' if chain == 'testnet' else 'regtest.' if chain == 'regtest' else ''
+        fp.write(chain_id + 'wallet=pool_stake\n')
+        fp.write(chain_id + 'wallet=pool_reward\n')
 
         fp.write('csindex=1\n')
         fp.write('addressindex=1\n')
@@ -306,8 +306,8 @@ def main():
 
             poolConfFile = os.path.join(poolDir, 'stakepool.json')
             if os.path.exists(poolConfFile):
-                print('Error: %s exists, exiting.' % (poolConfFile))
-                return
+                sys.stderr.write('Error: %s exists, exiting.' % (poolConfFile))
+                exit(1)
             with open(poolConfFile, 'w') as fp:
                 json.dump(settings, fp, indent=4)
 
@@ -368,8 +368,8 @@ def main():
 
     poolConfFile = os.path.join(poolDir, 'stakepool.json')
     if os.path.exists(poolConfFile):
-        print('Error: %s exists, exiting.' % (poolConfFile))
-        return
+        sys.stderr.write('Error: %s exists, exiting.' % (poolConfFile))
+        exit(1)
     with open(poolConfFile, 'w') as fp:
         json.dump(poolsettings, fp, indent=4)
 
