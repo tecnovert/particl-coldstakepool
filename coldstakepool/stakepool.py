@@ -43,14 +43,15 @@ from .util import (
 )
 
 DEBUG = True
+CURRENT_DB_VERSION = 1
 
 DBT_DATA = ord('d')
 DBT_BAL = ord('b')
 DBT_POOL_BAL = ord('p')
-DBT_POOL_BLOCK = ord('B')  # Key height : data blockhash + blockreward + poolcointotal
-DBT_POOL_PAYOUT = ord('P')  # Key height + txhash : data totalDisbursed
-DBT_POOL_PENDING_PAYOUT = ord('Q')
-DBT_POOL_METRICS = ord('M')  # Key Y-m : data nblocks + totalcoin
+DBT_POOL_BLOCK = ord('B')           # Key height : data blockhash + blockreward + poolcointotal
+DBT_POOL_PAYOUT = ord('P')          # Key height + txhash : data totalDisbursed
+DBT_POOL_PENDING_PAYOUT = ord('Q')  # Key txhash : data totalDisbursed + fees
+DBT_POOL_METRICS = ord('M')         # Key Y-m : data nblocks + totalcoin
 
 
 decimal.getcontext().prec = 8
@@ -66,6 +67,16 @@ def getDBMutex(method):
         finally:
             mxDB.release()
     return _impl
+
+
+def unpackMonthMetrics(m):
+    if m is None:
+        return [0, 0, 0]
+    return [struct.unpack('>i', m[:4])[0], int.from_bytes(m[4:20], 'big'), int.from_bytes(m[20:28], 'big')]
+
+
+def packMonthMetrics(m):
+    return struct.pack('>i', m[0]) + m[1].to_bytes(16, 'big') + m[2].to_bytes(8, 'big')
 
 
 class StakePool():
@@ -164,6 +175,9 @@ class StakePool():
             self.poolAddrReward = encodeAddress(addr)
         else:
             db.put(bytes([DBT_DATA]) + b'reward_addr', decodeAddress(self.poolAddrReward))
+
+        n = db.get(bytes([DBT_DATA]) + b'db_version')
+        db_version = 0 if n is None else struct.unpack('>i', n)[0]
         db.close()
 
         # Wait for daemon to start
@@ -176,6 +190,8 @@ class StakePool():
 
         # Todo: read rpc port from .conf file
         self.rpc_port = settings['rpcport'] if 'rpcport' in settings else (51735 if self.chain == 'mainnet' else 51935)
+
+        self.upgradeDatabase(db_version)
 
         logmt(self.fp, 'Starting StakePool at height %d\nPool Address: %s, Reward Address: %s, Mode %s\n' % (self.poolHeight, self.poolAddr, self.poolAddrReward, self.mode))
 
@@ -219,7 +235,7 @@ class StakePool():
         for i in range(21):
             if i == 20:
                 logmt(self.fp, 'Can\'t connect to daemon RPC, exiting.')
-                self.stopRunning(1)  # exit with error so systemd will try restart it
+                self.stopRunning(1)  # exit with error so systemd will try restart stakepool
                 return
             try:
                 r = callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_stake')
@@ -255,15 +271,28 @@ class StakePool():
         else:
             logmt(self.fp, 'Withdraw pool rewards to address: Disabled.')
 
-    def getBalance(self, key, db, batchBalances):
-        n = batchBalances.get(key)
+    def upgradeDatabase(self, db_version):
+        if db_version >= CURRENT_DB_VERSION:
+            return
+
+        logmt(self.fp, 'Upgrading Database from version %d to %d.' % (db_version, CURRENT_DB_VERSION))
+
+        rv = self.rebuildMetrics()
+        logmt(self.fp, 'rebuildMetrics processed %d blocks and %d payments.' % (rv['processedblocks'], rv['processedpayments']))
+
+        db = plyvel.DB(self.dbPath, create_if_missing=True)
+        db.put(bytes([DBT_DATA]) + b'db_version', struct.pack('>i', CURRENT_DB_VERSION))
+        db.close()
+
+    def getBatched(self, key, db, batch_mirror):
+        n = batch_mirror.get(key)
         if n is None:
             n = db.get(key)
         return n
 
-    def setBalance(self, key, value, b, batchBalances):
+    def setBatched(self, key, value, b, batch_mirror):
         b.put(key, value)
-        batchBalances[key] = value
+        batch_mirror[key] = value
 
     @getDBMutex
     def processBlock(self, height):
@@ -378,14 +407,14 @@ class StakePool():
             date = dt.datetime.fromtimestamp(int(reward['blocktime'])).strftime('%Y-%m')
         else:
             # TODO: Remove
-            blockinfo = callrpc(self.rpc_port, self.rpc_auth, 'getblock', [reward['blockhash']])
+            blockinfo = callrpc(self.rpc_port, self.rpc_auth, 'getblockheader', [reward['blockhash']])
             date = dt.datetime.fromtimestamp(int(blockinfo['time'])).strftime('%Y-%m')
 
         dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
-        m = db.get(dbkey)
-        data = [1, poolCoinTotal]
-        month_metrics = data if m is None else [struct.unpack('>i', m[:4])[0] + data[0], int.from_bytes(m[4:20], 'big') + data[1]]
-        db.put(dbkey, struct.pack('>i', month_metrics[0]) + month_metrics[1].to_bytes(16, 'big'))
+        month_metrics = unpackMonthMetrics(db.get(dbkey))
+        month_metrics[0] += 1
+        month_metrics[1] += poolCoinTotal
+        db.put(dbkey, packMonthMetrics(month_metrics))
 
         poolRewardClients = int(poolRewardClients)
         for k, v in totals.items():
@@ -402,14 +431,14 @@ class StakePool():
                 stakeBonus = 0
 
             dbkey = bytes([DBT_BAL]) + decodeAddress(k)
-            n = self.getBalance(dbkey, db, batchBalances)
+            n = self.getBatched(dbkey, db, batchBalances)
             if n is not None:
                 addrTotal += int.from_bytes(n[:16], 'big')
-                self.setBalance(dbkey, addrTotal.to_bytes(16, 'big') + n[16:32] + v.to_bytes(8, 'big'), b, batchBalances)
+                self.setBatched(dbkey, addrTotal.to_bytes(16, 'big') + n[16:32] + v.to_bytes(8, 'big'), b, batchBalances)
             else:
                 addrPending = 0
                 addrPaidout = 0
-                self.setBalance(dbkey, addrTotal.to_bytes(16, 'big') + addrPending.to_bytes(8, 'big') + addrPaidout.to_bytes(8, 'big') + v.to_bytes(8, 'big'), b, batchBalances)
+                self.setBatched(dbkey, addrTotal.to_bytes(16, 'big') + addrPending.to_bytes(8, 'big') + addrPaidout.to_bytes(8, 'big') + v.to_bytes(8, 'big'), b, batchBalances)
 
             if self.debug:
                 with open(os.path.join(self.debugDir, k + '.csv'), 'a') as fp:
@@ -610,7 +639,7 @@ class StakePool():
                     continue
 
                 dbkey = bytes([DBT_BAL]) + decodeAddress(address)
-                n = self.getBalance(dbkey, db, batchBalances)
+                n = self.getBatched(dbkey, db, batchBalances)
                 if n is None:
                     logmt(self.fp, 'Withdrawal detected from pool reward balance %s %d %s.\n' % (txid, out['n'], format8(v)))
 
@@ -640,7 +669,7 @@ class StakePool():
                         addrReward += addrPending * COIN
                     addrPending = 0
 
-                self.setBalance(dbkey, addrReward.to_bytes(16, 'big') + addrPending.to_bytes(8, 'big') + addrPaidout.to_bytes(8, 'big') + n[32:], b, batchBalances)
+                self.setBatched(dbkey, addrReward.to_bytes(16, 'big') + addrPending.to_bytes(8, 'big') + addrPaidout.to_bytes(8, 'big') + n[32:], b, batchBalances)
 
                 if self.debug:
                     logmt(self.fp, 'Payout to %s: %s %d %s.\n' % (address, txid, out['n'], format8(v)))
@@ -648,6 +677,19 @@ class StakePool():
             if totalDisbursed > 0:
                 b.put(bytes([DBT_POOL_PAYOUT]) + struct.pack('>i', height) + bytes.fromhex(txid), totalDisbursed.to_bytes(8, 'big'))
                 b.delete(bytes([DBT_POOL_PENDING_PAYOUT]) + bytes.fromhex(txid))
+
+                dbkey = bytes([DBT_DATA]) + b'pool_disbursed'
+                n = self.getBatched(dbkey, db, batchBalances)
+                pool_disbursed = totalDisbursed if n is None else totalDisbursed + int.from_bytes(n, 'big')
+                self.setBatched(dbkey, pool_disbursed.to_bytes(8, 'big'), b, batchBalances)
+
+                date = dt.datetime.fromtimestamp(int(ro['blocktime'])).strftime('%Y-%m')
+                dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
+                m = self.getBatched(dbkey, db, batchBalances)
+                if m is not None:
+                    month_metrics = unpackMonthMetrics(m)
+                    month_metrics[2] += totalDisbursed
+                    self.setBatched(dbkey, packMonthMetrics(month_metrics), b, batchBalances)
 
             try:
                 if have_blinded:
@@ -659,9 +701,9 @@ class StakePool():
                     logmt(self.fp, 'Payout tx %s, input %s, output %s, fee %s.\n' % (txid, format8(total_input_value), format8(total_output_value), format8(fee)))
 
                 dbkey = bytes([DBT_DATA]) + b'pool_fees_detected'
-                n = db.get(dbkey)
-                totalPoolFees = fee if n is None else fee + int.from_bytes(n, 'big')
-                b.put(dbkey, totalPoolFees.to_bytes(8, 'big'))
+                n = self.getBatched(dbkey, db, batchBalances)
+                total_pool_fees = fee if n is None else fee + int.from_bytes(n, 'big')
+                self.setBatched(dbkey, total_pool_fees.to_bytes(8, 'big'), b, batchBalances)
             except Exception:
                 exc_type, exc_value, exc_tb = sys.exc_info()
                 traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -795,7 +837,7 @@ class StakePool():
     @getDBMutex
     def rebuildMetrics(self):
 
-        # Remove old cache
+        # Remove old metrics cache records
         db = plyvel.DB(self.dbPath)
         it = db.iterator(prefix=bytes([DBT_POOL_METRICS]))
         try:
@@ -813,34 +855,59 @@ class StakePool():
                 k, v = next(it)
                 foundblock = (struct.unpack('>i', k[1:])[0], v[:32].hex(), int.from_bytes(v[32:40], 'big'), int.from_bytes(v[40:48], 'big'))
 
-                blockinfo = callrpc(self.rpc_port, self.rpc_auth, 'getblock', [foundblock[1]])
+                blockinfo = callrpc(self.rpc_port, self.rpc_auth, 'getblockheader', [foundblock[1]])
                 date = dt.datetime.fromtimestamp(int(blockinfo['time'])).strftime('%Y-%m')
 
                 dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
-                m = db.get(dbkey)
-                data = [1, foundblock[3]]
-                month_metrics = data if m is None else [struct.unpack('>i', m[:4])[0] + data[0], int.from_bytes(m[4:20], 'big') + data[1]]
-                db.put(dbkey, struct.pack('>i', month_metrics[0]) + month_metrics[1].to_bytes(16, 'big'))
+                month_metrics = unpackMonthMetrics(db.get(dbkey))
+                month_metrics[0] += 1
+                month_metrics[1] += foundblock[3]
+                db.put(dbkey, packMonthMetrics(month_metrics))
 
                 num_blocks += 1
         except Exception:
             pass
         it.close()
+
+        pool_disbursed = 0
+        num_payments = 0
+        it = db.iterator(prefix=bytes([DBT_POOL_PAYOUT]), reverse=True)
+        try:
+            while True:
+                k, v = next(it)
+                found_payment = (struct.unpack('>i', k[1:5])[0], int.from_bytes(v[:8], 'big'))
+
+                blockhash = callrpc(self.rpc_port, self.rpc_auth, 'getblockhash', [found_payment[0]])
+                blockinfo = callrpc(self.rpc_port, self.rpc_auth, 'getblockheader', [blockhash])
+                date = dt.datetime.fromtimestamp(int(blockinfo['time'])).strftime('%Y-%m')
+
+                dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
+                month_metrics = unpackMonthMetrics(db.get(dbkey))
+                month_metrics[2] += found_payment[1]
+                db.put(dbkey, packMonthMetrics(month_metrics))
+
+                pool_disbursed += found_payment[1]
+                num_payments += 1
+        except Exception:
+            pass
+        it.close()
+
+        db.put(bytes([DBT_DATA]) + b'pool_disbursed', pool_disbursed.to_bytes(8, 'big'))
+
         db.close()
 
-        return {'processedblocks': num_blocks}
+        return {'processedblocks': num_blocks, 'processedpayments': num_payments}
 
     @getDBMutex
     def getMetrics(self):
-
         db = plyvel.DB(self.dbPath)
         month_metrics = []
         it = db.iterator(prefix=bytes([DBT_POOL_METRICS]), reverse=True)
         try:
             for i in range(12):
                 k, v = next(it)
-                data = (struct.unpack('>i', v[:4])[0], int.from_bytes(v[4:20], 'big'))
-                month_metrics.append([k[1:].decode('UTF-8'), data[0], data[1] // data[0]])
+                data = unpackMonthMetrics(v)
+                month_metrics.append([k[1:].decode('UTF-8'), data[0], data[1] // data[0], data[2]])
         except Exception:
             pass
         it.close()
@@ -861,6 +928,9 @@ class StakePool():
 
         n = db.get(bytes([DBT_DATA]) + b'blocks_found')
         rv['blocksfound'] = 0 if n is None else struct.unpack('>i', n)[0]
+
+        n = db.get(bytes([DBT_DATA]) + b'pool_disbursed')
+        rv['totaldisbursed'] = 0 if n is None else int.from_bytes(n, 'big')
 
         n = db.get(bytes([DBT_POOL_BAL]) + decodeAddress(self.poolAddrReward))
         rv['poolrewardtotal'] = 0 if n is None else int.from_bytes(n, 'big')

@@ -142,6 +142,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             + '</p><p>' \
             + 'Synced Height: ' + str(summary['poolheight']) + '<br/>' \
             + 'Blocks Found: ' + str(summary['blocksfound']) + '<br/>' \
+            + 'Total Disbursed: ' + format8(summary['totaldisbursed']) + '<br/>' \
             + 'Last Payment Run: ' + str(summary['lastpaymentrunheight']) + '<br/>' \
             + '<br/>' \
             + 'Total Pool Rewards: ' + format8(summary['poolrewardtotal']) + '<br/>' \
