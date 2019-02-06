@@ -58,7 +58,7 @@ PARTICL_BINDIR = os.path.expanduser(os.getenv('PARTICL_BINDIR', '~/particl-binar
 PARTICLD = os.getenv('PARTICLD', 'particld')
 PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
 
-PARTICL_VERSION = '0.17.1.0'
+PARTICL_VERSION = '0.17.1.2'
 PARTICL_VERSION_TAG = ''
 
 
