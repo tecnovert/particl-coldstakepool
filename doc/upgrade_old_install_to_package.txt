@@ -5,6 +5,10 @@ Login to your machine, replace stakepoolvps with the correct ip address:
 $ ssh stakepooluser@stakepoolvps
 
 
+Install the required packages:
+$ sudo apt-get install python3-pip python3-setuptools
+
+
 Clone the new code and install package:
 $ git clone https://github.com/particl/coldstakepool particl_stakepool
 

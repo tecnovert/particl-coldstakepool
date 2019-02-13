@@ -1,0 +1,39 @@
+
+Upgrade to a new particld version.
+
+Login to your machine, replace stakepoolvps with the
+ip address or url of your pool:
+$ ssh stakepooluser@stakepoolvps
+
+
+Shut down the pool and daemon:
+$ sudo systemctl stop stakepool_live.service particld_live.service
+
+If running testnet:
+$ sudo systemctl stop stakepool_test.service particld_test.service
+
+
+Update Particl Core with:
+$ coldstakepool-prepare --update_core
+
+Output should end with lines similar to:
+particld --version
+Particl Core Daemon version v0.17.1.2.0-3f79b1b7c
+
+
+Start the pool/s back up:
+$ sudo systemctl start stakepool_live.service
+$ sudo systemctl start stakepool_test.service
+
+
+Verify:
+~/particl-binaries/particl-cli -datadir=${HOME}/stakepoolDemoLive getnetworkinfo
+"version": 17010200,
+"subversion": "/Satoshi:0.17.1.2/",
+
+
+Note:
+You can select specific versions of Particl Core and where to place
+them using the following environment variables:
+$ PARTICL_BINDIR=~/particl-alpha PARTICL_VERSION=0.18.0.1 PARTICL_VERSION_TAG=alpha coldstakepool-prepare --update_core
+

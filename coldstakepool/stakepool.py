@@ -195,6 +195,11 @@ class StakePool():
 
         logmt(self.fp, 'Starting StakePool at height %d\nPool Address: %s, Reward Address: %s, Mode %s\n' % (self.poolHeight, self.poolAddr, self.poolAddrReward, self.mode))
 
+        self.waitForDaemonRPC()
+
+        r = callrpc(self.rpc_port, self.rpc_auth, 'getnetworkinfo')
+        logmt(self.fp, 'Particl Core version %s\n' % (r['version']))
+
         if self.mode == 'master':
             self.runSanityChecks()
 
@@ -231,20 +236,23 @@ class StakePool():
 
                 self.lastHeightParametersSet = p['height']
 
-    def runSanityChecks(self):
+    def waitForDaemonRPC(self):
         for i in range(21):
             if i == 20:
                 logmt(self.fp, 'Can\'t connect to daemon RPC, exiting.')
                 self.stopRunning(1)  # exit with error so systemd will try restart stakepool
                 return
             try:
-                r = callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_stake')
+                callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_stake')
                 break
             except Exception as ex:
                 traceback.print_exc()
                 logmt(self.fp, 'Can\'t connect to daemon RPC, trying again in %d second/s.' % (1 + i))
                 time.sleep(1 + i)
+
+    def runSanityChecks(self):
         try:
+            r = callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_stake')
             if r['stakingoptions']['rewardaddress'] != self.poolAddrReward:
                 logmt(self.fp, 'Warning: Mismatched reward address!')
         except Exception:
