@@ -13,6 +13,12 @@ If running testnet:
 $ sudo systemctl stop stakepool_test.service particld_test.service
 
 
+Update the coldstakepool code:
+$ cd ~/particl_stakepool
+$ git pull
+$ sudo pip3 install --upgrade .
+
+
 Update Particl Core with:
 $ coldstakepool-prepare --update_core
 
