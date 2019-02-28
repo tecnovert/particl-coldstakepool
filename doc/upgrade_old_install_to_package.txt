@@ -49,7 +49,7 @@ Active: active (running)
 Exit status:
 Ctrl + C
 
-$ tail -n100 ~/stakepoolDemoLive/stakepool/stakepool_log.txt | grep coldstakepool
+$ tail -n100 ~/stakepoolDemoLive/stakepool/stakepool.log | grep coldstakepool
 coldstakepool-run, version: 0.0.1
 
 

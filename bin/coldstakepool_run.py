@@ -141,7 +141,7 @@ def main():
     if not os.path.exists(dataDir):
         os.makedirs(dataDir)
 
-    with open(os.path.join(dataDir, 'stakepool_log.txt'), 'w') as fp:
+    with open(os.path.join(dataDir, 'stakepool.log'), 'w') as fp:
         logmt(fp, os.path.basename(sys.argv[0]) + ', version: ' + __version__ + '\n\n')
         runStakePool(fp, dataDir, chain)
 
