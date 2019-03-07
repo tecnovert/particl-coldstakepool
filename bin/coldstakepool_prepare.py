@@ -60,6 +60,7 @@ PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
 
 PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.17.1.3')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
+PARTICL_ARCH = os.getenv('PARTICL_ARCH', 'x86_64-linux-gnu.tar.gz')
 
 
 def startDaemon(nodeDir, bindir):
@@ -85,18 +86,35 @@ class AppPrepare():
 def downloadParticlCore():
     print('Download and verify Particl core release.')
 
-    url_sig = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-linux/tecnovert/particl-linux-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, PARTICL_VERSION)
-    url_release = 'https://github.com/particl/particl-core/releases/download/v%s/particl-%s-x86_64-linux-gnu.tar.gz' % (PARTICL_VERSION + PARTICL_VERSION_TAG, PARTICL_VERSION)
+    if 'osx' in PARTICL_ARCH:
+        os_dir_name = 'osx-unsigned'
+        os_name = 'osx'
+    elif 'win32-setup' in PARTICL_ARCH or 'win64-setup' in PARTICL_ARCH:
+        os_dir_name = 'win-signed'
+        os_name = 'win-signer'
+    elif 'win32' in PARTICL_ARCH or 'win64' in PARTICL_ARCH:
+        os_dir_name = 'win-unsigned'
+        os_name = 'win'
+    else:
+        os_dir_name = 'linux'
+        os_name = 'linux'
 
-    assert_path = os.path.join(PARTICL_BINDIR, 'particl-linux-%s-build.assert' % (PARTICL_VERSION))
+    if os_dir_name == 'win-signed':
+        url_sig = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/tecnovert/particl-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, os_name)
+        assert_path = os.path.join(PARTICL_BINDIR, 'particl-%s-build.assert' % (os_name))
+    else:
+        url_sig = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/tecnovert/particl-%s-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, os_name, PARTICL_VERSION)
+        assert_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s-build.assert' % (os_name, PARTICL_VERSION))
+    url_release = 'https://github.com/particl/particl-core/releases/download/v%s/particl-%s-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, PARTICL_VERSION, PARTICL_ARCH)
+
     if not os.path.exists(assert_path):
         subprocess.check_call(['wget', url_sig + '-build.assert', '-P', PARTICL_BINDIR])
 
-    sig_path = os.path.join(PARTICL_BINDIR, 'particl-linux-%s-build.assert.sig' % (PARTICL_VERSION))
+    sig_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s-build.assert.sig' % (os_name, PARTICL_VERSION))
     if not os.path.exists(sig_path):
         subprocess.check_call(['wget', url_sig + '-build.assert.sig?raw=true', '-O', sig_path])
 
-    packed_path = os.path.join(PARTICL_BINDIR, 'particl-%s-x86_64-linux-gnu.tar.gz' % (PARTICL_VERSION))
+    packed_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s' % (PARTICL_VERSION, PARTICL_ARCH))
     if not os.path.exists(packed_path):
         subprocess.check_call(['wget', url_release, '-P', PARTICL_BINDIR])
 
@@ -127,6 +145,9 @@ def downloadParticlCore():
         sys.stderr.write('Error: Signature verification failed!')
         exit(1)
 
+
+def extractParticlCore():
+    packed_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s' % (PARTICL_VERSION, PARTICL_ARCH))
     daemon_path = os.path.join(PARTICL_BINDIR, PARTICLD)
     subprocess.check_call(['tar', '-xvf', packed_path, '-C', PARTICL_BINDIR])
     bin_path = os.path.join(PARTICL_BINDIR, 'particl-%s/bin/*' % (PARTICL_VERSION))
@@ -145,7 +166,8 @@ def printVersion():
 
 def printHelp():
     print('Usage: prepareSystem.py ')
-    print('\n--update_core              Download Particl core release and exit.')
+    print('\n--update_core              Download, verify and extract Particl core release and exit.')
+    print('\n--download_core            Download and verify Particl core release and exit.')
     print('\n--datadir=PATH             Path to Particl data directory, default:~/.particl.')
     print('\n--pooldir=PATH             Path to stakepool data directory, default:{datadir}/stakepool.')
     print('\n--mainnet                  Run Particl in mainnet mode.')
@@ -185,6 +207,10 @@ def main():
             printHelp()
             return 0
         if name == 'update_core':
+            downloadParticlCore()
+            extractParticlCore()
+            return 0
+        if name == 'download_core':
             downloadParticlCore()
             return 0
         if name == 'mainnet':
@@ -230,6 +256,7 @@ def main():
 
     # 1. Download and verify the specified version of particl-core
     downloadParticlCore()
+    extractParticlCore()
 
     dataDirWasNone = False
     if dataDir is None:
