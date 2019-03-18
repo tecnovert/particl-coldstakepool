@@ -32,7 +32,7 @@ $ vi ~/stakepoolDemoTest/stakepool/stakepool.json
 Adjust the startheight parameter to a block before the pool began
 operating.  Earlier blocks won't be scanned by the pool.
 
-$ sudo cp doc/config/*.service /etc/systemd/system
+$ sudo cp ~/particl_stakepool/doc/config/*.service /etc/systemd/system
 $ sudo systemctl daemon-reload
 
 
@@ -41,12 +41,15 @@ $ sudo systemctl enable particld_test.service stakepool_test.service
 
 Test:
 $ sudo tail -f /var/log/syslog
-$ ./particl-binaries/particl-cli -datadir=/home/stakepooluser/stakepoolDemoTest getblockchaininfo
+$ ~/particl-binaries/particl-cli -datadir=${HOME}/stakepoolDemoTest getblockchaininfo
 $ lynx localhost:9001
 
 
 
 -- Mainnet
+
+Stop the testnet pool if running:
+$ sudo systemctl stop particld_test.service stakepool_test.service
 
 $ coldstakepool-prepare -datadir=~/stakepoolDemoLive
 NOTE: Save both the recovery phrases:
@@ -59,7 +62,7 @@ $ vi ~/stakepoolDemoLive/stakepool/stakepool.json
 Adjust the startheight parameter.
 
 
-$ sudo cp doc/config/*.service /etc/systemd/system
+$ sudo cp ~/particl_stakepool/doc/config/*.service /etc/systemd/system
 $ sudo systemctl daemon-reload
 
 
@@ -68,12 +71,12 @@ $ sudo systemctl enable particld_live.service stakepool_live.service
 
 Test:
 $ sudo tail -f /var/log/syslog
-$ ~/particl-binaries/particl-cli -datadir=/home/stakepooluser/stakepoolDemoLive getblockchaininfo
+$ ~/particl-binaries/particl-cli -datadir=${HOME}/stakepoolDemoLive getblockchaininfo
 $ lynx localhost:9000
 
 
 $ sudo rm /etc/nginx/sites-enabled/default
-$ sudo cp doc/config/nginx_stakepool_forward.conf /etc/nginx/conf.d/
+$ sudo cp ~/particl_stakepool/doc/config/nginx_stakepool_forward.conf /etc/nginx/conf.d/
 
 $ sudo nginx -t
 
@@ -98,12 +101,12 @@ The production configuration enables:
 
 $ mkdir /tmp/nginx
 $ sudo rm /etc/nginx/conf.d/nginx_stakepool_forward.conf
-$ sudo cp doc/config/nginx_stakepool_production.conf /etc/nginx/conf.d/
+$ sudo cp ~/particl_stakepool/doc/config/nginx_stakepool_production.conf /etc/nginx/conf.d/
 $ sudo systemctl restart nginx
 
 Test, browse to:
-http://vpsip/api
-http://vpsip/api/testnet
+http://vpsip/api/
+http://vpsip/api/testnet/
 
 
 -- fancy frontend
