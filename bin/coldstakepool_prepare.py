@@ -58,7 +58,7 @@ PARTICL_BINDIR = os.path.expanduser(os.getenv('PARTICL_BINDIR', '~/particl-binar
 PARTICLD = os.getenv('PARTICLD', 'particld')
 PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
 
-PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.17.1.4')
+PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.18.0.7')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
 PARTICL_ARCH = os.getenv('PARTICL_ARCH', 'x86_64-linux-gnu.tar.gz')
 
