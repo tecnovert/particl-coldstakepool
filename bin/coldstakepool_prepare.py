@@ -57,6 +57,7 @@ from coldstakepool.util import (
 PARTICL_BINDIR = os.path.expanduser(os.getenv('PARTICL_BINDIR', '~/particl-binaries'))
 PARTICLD = os.getenv('PARTICLD', 'particld')
 PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
+PARTICL_TX = os.getenv('PARTICL_CLI', 'particl-tx')
 
 PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.18.0.7')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
@@ -99,11 +100,14 @@ def downloadParticlCore():
         os_dir_name = 'linux'
         os_name = 'linux'
 
+    signing_key_fingerprint = '8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B'
+    signing_key_name = 'tecnovert'
+
     if os_dir_name == 'win-signed':
-        url_sig = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/tecnovert/particl-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, os_name)
+        url_sig = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/particl-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, signing_key_name, os_name)
         assert_path = os.path.join(PARTICL_BINDIR, 'particl-%s-build.assert' % (os_name))
     else:
-        url_sig = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/tecnovert/particl-%s-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, os_name, PARTICL_VERSION)
+        url_sig = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/particl-%s-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, signing_key_name, os_name, PARTICL_VERSION)
         assert_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s-build.assert' % (os_name, PARTICL_VERSION))
     url_release = 'https://github.com/particl/particl-core/releases/download/v%s/particl-%s-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, PARTICL_VERSION, PARTICL_ARCH)
 
@@ -131,12 +135,17 @@ def downloadParticlCore():
         else:
             print('Found release hash %s in assert file.' % (release_hash.hex()))
 
-    signing_key_fingerprint = '8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B'
     try:
         subprocess.check_call(['gpg', '--list-keys', signing_key_fingerprint])
     except Exception:
         print('Downloading release signing pubkey')
-        subprocess.check_call(['gpg', '--keyserver', 'hkp://subset.pool.sks-keyservers.net', '--recv-keys', signing_key_fingerprint])
+        keyservers = ['keyserver.ubuntu.com', 'hkp://subset.pool.sks-keyservers.net']
+        for ks in keyservers:
+            try:
+                subprocess.check_call(['gpg', '--keyserver', ks, '--recv-keys', signing_key_fingerprint])
+            except Exception:
+                continue
+            break
         subprocess.check_call(['gpg', '--list-keys', signing_key_fingerprint])
 
     try:
@@ -149,11 +158,11 @@ def downloadParticlCore():
 def extractParticlCore():
     packed_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s' % (PARTICL_VERSION, PARTICL_ARCH))
     daemon_path = os.path.join(PARTICL_BINDIR, PARTICLD)
-    subprocess.check_call(['tar', '-xvf', packed_path, '-C', PARTICL_BINDIR])
-    bin_path = os.path.join(PARTICL_BINDIR, 'particl-%s/bin/*' % (PARTICL_VERSION))
-    subprocess.check_call(['cp ' + bin_path + ' ' + PARTICL_BINDIR], shell=True)  # Will fail if particld is running
+    bin_prefix = 'particl-%s/bin' % (PARTICL_VERSION)
+    subprocess.check_call(['tar', '-xvf', packed_path, '-C', PARTICL_BINDIR, '--strip-components', '2',
+                           os.path.join(bin_prefix, PARTICLD), os.path.join(bin_prefix, PARTICL_CLI), os.path.join(bin_prefix, PARTICL_TX)])
 
-    output = subprocess.check_output([daemon_path + ' --version'], shell=True)
+    output = subprocess.check_output([daemon_path, '--version'])
     version = output.splitlines()[0].decode('utf-8')
     print('particld --version\n' + version)
     assert(PARTICL_VERSION in version)
