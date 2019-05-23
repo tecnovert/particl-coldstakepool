@@ -33,8 +33,6 @@ from coldstakepool.util import (
 )
 
 ALLOW_CORS = True
-PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
-
 stakePool = None
 
 
@@ -55,6 +53,7 @@ def runStakePool(fp, dataDir, chain):
         settings = json.load(fs)
 
     stakePool = StakePool(fp, dataDir, settings, chain)
+    stakePool.start()
 
     threads = []
     if 'htmlhost' in settings:

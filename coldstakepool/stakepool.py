@@ -5,18 +5,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
-"""
-Particl Stake Pool - Proof of concept
-
-Staking should be disabled in the rewards wallet:
-    particl-cli -rpcwallet=pool_reward walletsettings stakingoptions "{\\"enabled\\":\\"false\\"}"
-
-
-Dependencies:
-    $ pacman -S python-pyzmq python-plyvel
-
-"""
-
 import sys
 import os
 import time
@@ -119,7 +107,10 @@ class StakePool():
 
         db = plyvel.DB(self.dbPath, create_if_missing=True)
         n = db.get(bytes([DBT_DATA]) + b'current_height')
-        if n is not None:
+        if n is None:
+            logmt(self.fp, 'First run\n')
+            db.put(bytes([DBT_DATA]) + b'db_version', struct.pack('>i', CURRENT_DB_VERSION))
+        else:
             self.poolHeight = struct.unpack('>i', n)[0]
 
         self.lastHeightParametersSet = -1
@@ -177,7 +168,7 @@ class StakePool():
             db.put(bytes([DBT_DATA]) + b'reward_addr', decodeAddress(self.poolAddrReward))
 
         n = db.get(bytes([DBT_DATA]) + b'db_version')
-        db_version = 0 if n is None else struct.unpack('>i', n)[0]
+        self.db_version = 0 if n is None else struct.unpack('>i', n)[0]
         db.close()
 
         # Wait for daemon to start
@@ -188,17 +179,17 @@ class StakePool():
         with open(authcookiepath) as fp:
             self.rpc_auth = fp.read()
 
-        # Todo: read rpc port from .conf file
+        # Todo: Read rpc port from .conf file
         self.rpc_port = settings['rpcport'] if 'rpcport' in settings else (51735 if self.chain == 'mainnet' else 51935)
 
-        self.upgradeDatabase(db_version)
-
+    def start(self):
         logmt(self.fp, 'Starting StakePool at height %d\nPool Address: %s, Reward Address: %s, Mode %s\n' % (self.poolHeight, self.poolAddr, self.poolAddrReward, self.mode))
 
+        self.upgradeDatabase(self.db_version)
         self.waitForDaemonRPC()
 
-        r = callrpc(self.rpc_port, self.rpc_auth, 'getnetworkinfo')
-        logmt(self.fp, 'Particl Core version %s\n' % (r['version']))
+        core_version = callrpc(self.rpc_port, self.rpc_auth, 'getnetworkinfo')['version']
+        logmt(self.fp, 'Particl Core version %s\n' % (core_version))
 
         if self.mode == 'master':
             self.runSanityChecks()
@@ -238,9 +229,11 @@ class StakePool():
 
     def waitForDaemonRPC(self):
         for i in range(21):
+            if not self.is_running:
+                return
             if i == 20:
                 logmt(self.fp, 'Can\'t connect to daemon RPC, exiting.')
-                self.stopRunning(1)  # exit with error so systemd will try restart stakepool
+                self.stopRunning(1)  # Exit with error so systemd will try restart stakepool
                 return
             try:
                 callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_stake')
@@ -981,14 +974,12 @@ class StakePool():
         except Exception:
             pass
         it.close()
-
         db.close()
 
         rv['lastblocks'] = lastBlocks
         rv['pendingpayments'] = pendingPayments
         rv['lastpayments'] = lastPayments
 
-        # TODO: cache at height
         try:
             stakinginfo = callrpc(self.rpc_port, self.rpc_auth, 'getstakinginfo', [], 'pool_stake')
             rv['stakeweight'] = stakinginfo['weight']
