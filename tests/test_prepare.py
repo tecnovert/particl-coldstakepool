@@ -26,6 +26,13 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 
 class Test(unittest.TestCase):
 
+    @classmethod
+    def tearDownClass(self):
+        shutil.rmtree(os.path.expanduser('~/csp_mainnet'))
+        shutil.rmtree(os.path.expanduser('~/csp_testnet'))
+        shutil.rmtree(os.path.expanduser('~/csp_testnet_obs'))
+        shutil.rmtree(os.path.expanduser('~/csp_regtest'))
+
     def test_mode_no_url(self):
         testargs = ['coldstakepool-prepare', '--mode=observer']
         with patch('sys.stderr', new=StringIO()) as fake_stderr:
@@ -54,19 +61,25 @@ class Test(unittest.TestCase):
                     prepareSystem.main()
         self.assertEqual(cm.exception.code, 1)
         self.assertTrue('particl.conf exists' in fake_stderr.getvalue())
-        shutil.rmtree(os.path.expanduser('~/csp_mainnet'))
 
     def test_prepare_testnet(self):
         testargs = ['coldstakepool-prepare', '--datadir=~/csp_testnet', '--testnet']
         with patch.object(sys, 'argv', testargs):
             prepareSystem.main()
-        shutil.rmtree(os.path.expanduser('~/csp_testnet'))
+
+    def test_prepare_testnet_observer(self):
+        testargs = ['coldstakepool-prepare', '--datadir=~/csp_testnet_obs', '--testnet', '--mode=observer', '--configurl=file://' + os.path.expanduser('~/csp_testnet/stakepool/stakepool.json')]
+        with patch.object(sys, 'argv', testargs):
+            prepareSystem.main()
+
+        with open(os.path.expanduser('~/csp_testnet_obs/stakepool/stakepool.json')) as fp:
+            settings = json.load(fp)
+            assert(settings['mode'] == 'observer')
 
     def test_prepare_regtest(self):
         testargs = ['coldstakepool-prepare', '--datadir=~/csp_regtest', '--regtest']
         with patch.object(sys, 'argv', testargs):
             prepareSystem.main()
-        shutil.rmtree(os.path.expanduser('~/csp_regtest'))
 
 
 if __name__ == '__main__':

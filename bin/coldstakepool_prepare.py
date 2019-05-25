@@ -323,7 +323,7 @@ def main():
         if mode == 'observer':
             print('Preparing observer config.')
 
-            settings = json.load(urllib.request.urlopen(configurl))
+            settings = json.loads(urllib.request.urlopen(configurl).read().decode('utf-8'))
 
             settings['mode'] = 'observer'
             settings['particlbindir'] = PARTICL_BINDIR
@@ -337,8 +337,6 @@ def main():
 
             callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake importaddress "%s"' % (v['address']))
             callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward importaddress "%s"' % (pool_reward_address))
-
-            callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'stop')
 
             poolConfFile = os.path.join(poolDir, 'stakepool.json')
             if os.path.exists(poolConfFile):
