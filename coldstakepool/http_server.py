@@ -259,6 +259,7 @@ class HttpThread(threading.Thread, HTTPServer):
     def serve_forever(self):
         while not self.stopped():
             self.handle_request()
+        self.socket.close()
 
     def run(self):
         self.serve_forever()
