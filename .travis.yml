@@ -28,6 +28,6 @@ jobs:
       before_script:
       script:
         - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841
-        - codespell --check-filenames --disable-colors --quiet-level=7
+        - codespell --check-filenames --disable-colors --quiet-level=7 -L keyservers -S .git
       after_success:
         - echo "End lint"
