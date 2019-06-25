@@ -15,6 +15,7 @@ import traceback
 import plyvel
 import struct
 from functools import wraps
+from . import __version__
 from .util import (
     COIN,
     callrpc,
@@ -74,6 +75,7 @@ class StakePool():
         self.fp = fp
         self.dataDir = dataDir
         self.settings = settings
+        self.core_version = None  # Set during start()
 
         self.blockBuffer = 100  # Work n blocks from the tip to avoid forks, should be > COINBASE_MATURITY
 
@@ -187,8 +189,8 @@ class StakePool():
         self.upgradeDatabase(self.db_version)
         self.waitForDaemonRPC()
 
-        core_version = callrpc(self.rpc_port, self.rpc_auth, 'getnetworkinfo')['version']
-        logmt(self.fp, 'Particl Core version %s\n' % (core_version))
+        self.core_version = callrpc(self.rpc_port, self.rpc_auth, 'getnetworkinfo')['version']
+        logmt(self.fp, 'Particl Core version %s\n' % (self.core_version))
 
         if self.mode == 'master':
             self.runSanityChecks()
@@ -994,3 +996,7 @@ class StakePool():
             rv['stakedbalance'] = 0
 
         return rv
+
+    def getVersions(self):
+        return {'pool': __version__,
+                'core': 'Unknown' if self.core_version is None else str(self.core_version)}
