@@ -79,20 +79,20 @@ class StakePool():
 
         self.blockBuffer = 100  # Work n blocks from the tip to avoid forks, should be > COINBASE_MATURITY
 
-        self.mode = settings['mode'] if 'mode' in settings else 'master'
+        self.mode = settings.get('mode', 'master')
         self.binDir = os.path.expanduser(settings['particlbindir'])
         self.particlDataDir = os.path.expanduser(settings['particldatadir'])
         self.chain = chain
-        self.debug = settings['debug'] if 'debug' in settings else DEBUG
+        self.debug = settings.get('debug', DEBUG)
 
         self.poolAddrHrp = 'pcs' if self.chain == 'mainnet' else 'tpcs'
 
         self.poolAddr = settings['pooladdress']
         self.poolAddrReward = settings['rewardaddress']
 
-        self.poolHeight = settings['startheight'] if 'startheight' in settings else 0
+        self.poolHeight = settings.get('startheight', 0)
 
-        self.maxOutputsPerTx = settings['maxoutputspertx'] if 'maxoutputspertx' in settings else 48
+        self.maxOutputsPerTx = settings.get('maxoutputspertx', 48)
 
         # Default parameters
         self.poolFeePercent = 2
@@ -181,7 +181,7 @@ class StakePool():
             self.rpc_auth = fp.read()
 
         # Todo: Read rpc port from .conf file
-        self.rpc_port = settings['rpcport'] if 'rpcport' in settings else (51735 if self.chain == 'mainnet' else 51935)
+        self.rpc_port = settings.get('rpcport', 51735 if self.chain == 'mainnet' else 51935)
 
     def start(self):
         logmt(self.fp, 'Starting StakePool at height %d\nPool Address: %s, Reward Address: %s, Mode %s\n' % (self.poolHeight, self.poolAddr, self.poolAddrReward, self.mode))

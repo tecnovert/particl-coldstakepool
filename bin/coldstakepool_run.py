@@ -58,9 +58,9 @@ def runStakePool(fp, dataDir, chain):
     threads = []
     if 'htmlhost' in settings:
         logmt(fp, 'Starting server at %s:%d.' % (settings['htmlhost'], settings['htmlport']))
-        allow_cors = settings['allowcors'] if 'allowcors' in settings else ALLOW_CORS
-        key_salt = settings['management_key_salt'] if 'management_key_salt' in settings else None
-        key_hash = settings['management_key_hash'] if 'management_key_hash' in settings else None
+        allow_cors = settings.get('allowcors', ALLOW_CORS)
+        key_salt = settings.get('management_key_salt', None)
+        key_hash = settings.get('management_key_hash', None)
         tS1 = HttpThread(fp, settings['htmlhost'], settings['htmlport'], allow_cors, stakePool, key_salt, key_hash)
         threads.append(tS1)
         tS1.start()
