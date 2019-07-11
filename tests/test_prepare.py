@@ -16,8 +16,7 @@ from unittest.mock import patch
 import logging
 import shutil
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../bin')))
-import coldstakepool_prepare as prepareSystem  # noqa: E402
+import bin.coldstakepool_prepare as prepareSystem
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
