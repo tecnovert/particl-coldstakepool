@@ -59,9 +59,10 @@ PARTICLD = os.getenv('PARTICLD', 'particld')
 PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
 PARTICL_TX = os.getenv('PARTICL_CLI', 'particl-tx')
 
-PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.18.0.10')
+PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.18.0.11')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
 PARTICL_ARCH = os.getenv('PARTICL_ARCH', 'x86_64-linux-gnu.tar.gz')
+PARTICL_REPO = os.getenv('PARTICL_REPO', 'particl')
 
 
 def startDaemon(nodeDir, bindir):
@@ -104,23 +105,26 @@ def downloadParticlCore():
     signing_key_name = 'tecnovert'
 
     if os_dir_name == 'win-signed':
-        url_sig = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/particl-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, signing_key_name, os_name)
-        assert_path = os.path.join(PARTICL_BINDIR, 'particl-%s-build.assert' % (os_name))
+        assert_filename = 'particl-{}-build.assert'.format(os_name)
     else:
-        url_sig = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/particl-%s-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, signing_key_name, os_name, PARTICL_VERSION)
-        assert_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s-build.assert' % (os_name, PARTICL_VERSION))
-    url_release = 'https://github.com/particl/particl-core/releases/download/v%s/particl-%s-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, PARTICL_VERSION, PARTICL_ARCH)
+        assert_filename = 'particl-{}-{}-build.assert'.format(os_name, PARTICL_VERSION)
+
+    assert_url = 'https://raw.githubusercontent.com/%s/gitian.sigs/master/%s-%s/%s/%s' % (PARTICL_REPO, PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, signing_key_name, assert_filename)
+    assert_path = os.path.join(PARTICL_BINDIR, assert_filename)
+
+    release_filename = 'particl-{}-{}'.format(PARTICL_VERSION, PARTICL_ARCH)
+    release_url = 'https://github.com/%s/particl-core/releases/download/v%s/%s' % (PARTICL_REPO, PARTICL_VERSION + PARTICL_VERSION_TAG, release_filename)
 
     if not os.path.exists(assert_path):
-        subprocess.check_call(['wget', url_sig + '-build.assert', '-P', PARTICL_BINDIR])
+        subprocess.check_call(['wget', assert_url, '-P', PARTICL_BINDIR])
 
     sig_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s-build.assert.sig' % (os_name, PARTICL_VERSION))
     if not os.path.exists(sig_path):
-        subprocess.check_call(['wget', url_sig + '-build.assert.sig?raw=true', '-O', sig_path])
+        subprocess.check_call(['wget', assert_url + '.sig?raw=true', '-O', sig_path])
 
-    packed_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s' % (PARTICL_VERSION, PARTICL_ARCH))
+    packed_path = os.path.join(PARTICL_BINDIR, release_filename)
     if not os.path.exists(packed_path):
-        subprocess.check_call(['wget', url_release, '-P', PARTICL_BINDIR])
+        subprocess.check_call(['wget', release_url, '-P', PARTICL_BINDIR])
 
     hasher = hashlib.sha256()
     with open(packed_path, 'rb') as fp:
