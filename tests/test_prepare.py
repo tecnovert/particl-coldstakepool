@@ -15,9 +15,8 @@ from io import StringIO
 from unittest.mock import patch
 import logging
 import shutil
-import importlib
 
-prepareSystem = importlib.import_module('bin.coldstakepool-prepare')
+import bin.coldstakepool_prepare as prepareSystem
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
