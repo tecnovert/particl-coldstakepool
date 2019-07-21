@@ -77,14 +77,6 @@ def startDaemon(nodeDir, bindir):
     return out[0]
 
 
-class AppPrepare():
-    def __init__(self, mode='normal', test_param=None):
-        # Validate and process argument options
-        self.parse_args(mode, test_param)
-        # Initialize database connection
-        self.app_name = self.get_app_name(self.name)
-
-
 def downloadParticlCore():
     print('Download and verify Particl core release.')
 
