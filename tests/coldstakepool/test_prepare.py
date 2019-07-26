@@ -43,7 +43,7 @@ class Test(unittest.TestCase):
         self.assertTrue('observer mode requires configurl' in fake_stderr.getvalue())
 
     def test_example_config(self):
-        settings_path = os.path.join(os.path.dirname(__file__), '..', 'doc', 'config', 'stakepool.json')
+        settings_path = os.path.join(os.path.dirname(__file__), '..', '..', 'doc', 'config', 'stakepool.json')
 
         with open(settings_path) as fs:
             settings = json.load(fs)

@@ -68,7 +68,7 @@ PARTICL_REPO = os.getenv('PARTICL_REPO', 'particl')
 def startDaemon(nodeDir, bindir):
     command_cli = os.path.join(bindir, PARTICLD)
 
-    args = [command_cli, '-daemon', '-connect=0', '-datadir=' + nodeDir]
+    args = [command_cli, '-daemon', '-noconnect', '-nostaking', '-nodnsseed', '-datadir=' + nodeDir]
     p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out = p.communicate()
 
