@@ -13,6 +13,7 @@ import http.client
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from .util import (
     COIN,
+    makeInt,
     format8,
     format16,
 )
@@ -140,8 +141,12 @@ class HttpHandler(BaseHTTPRequestHandler):
             + 'Stake Bonus: ' + str(stakePool.stakeBonusPercent) + '%<br/>' \
             + 'Payout Threshold: ' + format8(stakePool.payoutThreshold) + '<br/>' \
             + 'Blocks Between Payment Runs: ' + str(stakePool.minBlocksBetweenPayments) + '<br/>' \
-            + 'Minimum output value: ' + format8(stakePool.minOutputValue) + '<br/>' \
-            + '</p><p>' \
+            + 'Minimum output value: ' + format8(stakePool.minOutputValue) + '<br/>'
+
+        if stakePool.smsg_fee_rate_target is not None:
+            content += 'SMSG fee rate target: ' + format8(makeInt(stakePool.smsg_fee_rate_target)) + '<br/>'
+
+        content += '</p><p>' \
             + 'Synced Height: ' + str(summary['poolheight']) + '<br/>' \
             + 'Blocks Found: ' + str(summary['blocksfound']) + '<br/>' \
             + 'Total Disbursed: ' + format8(summary['totaldisbursed']) + '<br/>' \

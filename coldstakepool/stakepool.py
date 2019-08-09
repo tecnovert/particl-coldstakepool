@@ -76,6 +76,7 @@ class StakePool():
         self.dataDir = dataDir
         self.settings = settings
         self.core_version = None  # Set during start()
+        self.daemon_running = False
 
         self.blockBuffer = 100  # Work n blocks from the tip to avoid forks, should be > COINBASE_MATURITY
 
@@ -103,6 +104,7 @@ class StakePool():
 
         self.minOutputValue = int(0.1 * COIN)  # Ignore any outputs of lower value when accumulating rewards
         self.tx_fee_per_kb = None
+        self.smsg_fee_rate_target = None
 
         self.dbPath = os.path.join(dataDir, 'stakepooldb')
 
@@ -194,6 +196,7 @@ class StakePool():
 
         if self.mode == 'master':
             self.runSanityChecks()
+        self.daemon_running = True
 
     def stopRunning(self, with_code=0):
         self.fail_code = with_code
@@ -225,35 +228,54 @@ class StakePool():
                     self.minOutputValue = int(p['minoutputvalue'] * COIN)
                 if 'txfeerate' in p:
                     self.tx_fee_per_kb = p['txfeerate']
+                self.smsg_fee_rate_target = p.get('smsgfeeratetarget', None)
+
+                if self.mode == 'master' and self.daemon_running:
+                    self.runSanityChecks()
 
                 self.lastHeightParametersSet = p['height']
 
     def waitForDaemonRPC(self):
-        for i in range(21):
+        for i in range(20):
             if not self.is_running:
-                return
-            if i == 20:
-                logmt(self.fp, 'Can\'t connect to daemon RPC, exiting.')
-                self.stopRunning(1)  # Exit with error so systemd will try restart stakepool
                 return
             try:
                 callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_stake')
-                break
+                return
             except Exception as ex:
                 traceback.print_exc()
                 logmt(self.fp, 'Can\'t connect to daemon RPC, trying again in %d second/s.' % (1 + i))
                 time.sleep(1 + i)
+        logmt(self.fp, 'Can\'t connect to daemon RPC, exiting.')
+        self.stopRunning(1)  # Exit with error so systemd will try restart stakepool
 
     def runSanityChecks(self):
         try:
             r = callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_stake')
-            if r['stakingoptions']['rewardaddress'] != self.poolAddrReward:
-                logmt(self.fp, 'Warning: Mismatched reward address!')
+            options = r['stakingoptions']
+            reset_stakingoptions = False
+            if not isinstance(options, dict):
+                options = dict()
+            if options.get('rewardaddress', None) != self.poolAddrReward:
+                logmt(self.fp, 'Warning: Incorrect reward address, updating to {}'.format(self.poolAddrReward))
+                reset_stakingoptions = True
+            if options.get('smsgfeeratetarget', None) != self.smsg_fee_rate_target:
+                logmt(self.fp, 'Warning: Incorrect smsg fee rate target, updating to {}'.format(self.smsg_fee_rate_target))
+                reset_stakingoptions = True
+
+            if reset_stakingoptions:
+                options['rewardaddress'] = self.poolAddrReward
+                if self.smsg_fee_rate_target is not None:
+                    options['smsgfeeratetarget'] = self.smsg_fee_rate_target
+                else:
+                    options.pop('smsgfeeratetarget', None)
+                callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions', options], 'pool_stake')
+
         except Exception:
             logmt(self.fp, 'Warning: \'pool_stake\' wallet reward address isn\'t set!')
 
-        r = callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_reward')
         try:
+            r = callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_reward')
             if r['stakingoptions']['enabled'] is not False:
                 if r['stakingoptions']['enabled'].lower() != 'false':
                     logmt(self.fp, 'Warning: Staking is not disabled on the \'pool_reward\' wallet!')

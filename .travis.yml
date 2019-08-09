@@ -1,4 +1,4 @@
-dist: buster
+dist: bionic
 os: linux
 language: python
 python: '3.7'
@@ -8,6 +8,8 @@ cache:
 stages:
   - lint
 env:
+before_install:
+  - sudo apt-get install -y wget gnupg2
 script:
   - python setup.py test
 after_success:
@@ -19,9 +21,7 @@ jobs:
       env:
       cache: false
       language: python
-      python: '3.6'
-      before_install:
-        - sudo apt-get install -y wget gnupg
+      python: '3.7'
       install:
         - travis_retry pip install flake8==3.5.0
         - travis_retry pip install codespell==1.15.0
