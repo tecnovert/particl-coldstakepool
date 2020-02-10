@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2019 The Particl Core developers
+# Copyright (c) 2018-2020 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
@@ -177,10 +177,11 @@ class Jsonrpc():
         # establish a "logical" server connection
 
         # get the url
-        type, uri = urllib.parse.splittype(uri)
-        if type not in ("http", "https"):
+        parsed = urllib.parse.urlparse(uri)
+        if parsed.scheme not in ("http", "https"):
             raise OSError("unsupported XML-RPC protocol")
-        self.__host, self.__handler = urllib.parse.splithost(uri)
+        self.__host = parsed.netloc
+        self.__handler = parsed.path
         if not self.__handler:
             self.__handler = "/RPC2"
 
