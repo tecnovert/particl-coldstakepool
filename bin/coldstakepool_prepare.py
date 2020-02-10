@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2019 The Particl Core developers
+# Copyright (c) 2018-2020 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
@@ -59,7 +59,7 @@ PARTICLD = os.getenv('PARTICLD', 'particld')
 PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
 PARTICL_TX = os.getenv('PARTICL_CLI', 'particl-tx')
 
-PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.18.1.3')
+PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.18.1.6')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
 PARTICL_ARCH = os.getenv('PARTICL_ARCH', 'x86_64-linux-gnu.tar.gz')
 PARTICL_REPO = os.getenv('PARTICL_REPO', 'particl')
