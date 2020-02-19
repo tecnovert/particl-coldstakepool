@@ -43,11 +43,13 @@ coldstakepool-run.py -datadir=~/stakepoolDemoTest/stakepool -testnet
 
 import sys
 import os
-import subprocess
+import mmap
 import time
 import json
+import stat
 import hashlib
-import mmap
+import tarfile
+import subprocess
 import urllib.request
 from coldstakepool.util import (
     callrpc_cli,
@@ -56,8 +58,8 @@ from coldstakepool.util import (
 
 PARTICL_BINDIR = os.path.expanduser(os.getenv('PARTICL_BINDIR', '~/particl-binaries'))
 PARTICLD = os.getenv('PARTICLD', 'particld')
+PARTICL_TX = os.getenv('PARTICL_TX', 'particl-tx')
 PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
-PARTICL_TX = os.getenv('PARTICL_CLI', 'particl-tx')
 
 PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.18.1.6')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
@@ -152,11 +154,19 @@ def downloadParticlCore():
 
 
 def extractParticlCore():
-    packed_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s' % (PARTICL_VERSION, PARTICL_ARCH))
+    packed_path = os.path.join(PARTICL_BINDIR, 'particl-{}-{}'.format(PARTICL_VERSION, PARTICL_ARCH))
     daemon_path = os.path.join(PARTICL_BINDIR, PARTICLD)
-    bin_prefix = 'particl-%s/bin' % (PARTICL_VERSION)
-    subprocess.check_call(['tar', '-xvf', packed_path, '-C', PARTICL_BINDIR, '--strip-components', '2',
-                           os.path.join(bin_prefix, PARTICLD), os.path.join(bin_prefix, PARTICL_CLI), os.path.join(bin_prefix, PARTICL_TX)])
+    bin_prefix = PARTICL_BINDIR
+
+    bins = [PARTICLD, PARTICL_CLI, PARTICL_TX]
+    with tarfile.open(packed_path) as ft:
+        for b in bins:
+            out_path = os.path.join(bin_prefix, b)
+            fi = ft.extractfile('{}-{}/bin/{}'.format('particl', PARTICL_VERSION, b))
+            with open(out_path, 'wb') as fout:
+                fout.write(fi.read())
+            fi.close()
+            os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
 
     output = subprocess.check_output([daemon_path, '--version'])
     version = output.splitlines()[0].decode('utf-8')
@@ -172,18 +182,18 @@ def printVersion():
 def printHelp():
     print('Usage: coldstakepool-prepare ')
     print('\n--help, -h                 Print help.')
-    print('\n--version, -v              Print version.')
-    print('\n--update_core              Download, verify and extract Particl core release and exit.')
-    print('\n--download_core            Download and verify Particl core release and exit.')
-    print('\n--datadir=PATH             Path to Particl data directory, default:~/.particl.')
-    print('\n--pooldir=PATH             Path to stakepool data directory, default:{datadir}/stakepool.')
-    print('\n--mainnet                  Run Particl in mainnet mode.')
-    print('\n--testnet                  Run Particl in testnet mode.')
-    print('\n--regtest                  Run Particl in regtest mode.')
-    print('\n--stake_wallet_mnemonic=   Recovery phrase to use for the staking wallet, default is randomly generated.')
-    print('\n--reward_wallet_mnemonic=  Recovery phrase to use for the reward wallet, default is randomly generated.')
-    print('\n--mode=master/observer     Mode stakepool is initialised to. observer mode requires configurl to be specified, default:master.')
-    print('\n--configurl=url            Url to pull the stakepool config file from when initialising for observer mode.')
+    print('--version, -v              Print version.')
+    print('--update_core              Download, verify and extract Particl core release and exit.')
+    print('--download_core            Download and verify Particl core release and exit.')
+    print('--datadir=PATH             Path to Particl data directory, default:~/.particl.')
+    print('--pooldir=PATH             Path to stakepool data directory, default:{datadir}/stakepool.')
+    print('--mainnet                  Run Particl in mainnet mode.')
+    print('--testnet                  Run Particl in testnet mode.')
+    print('--regtest                  Run Particl in regtest mode.')
+    print('--stake_wallet_mnemonic=   Recovery phrase to use for the staking wallet, default is randomly generated.')
+    print('--reward_wallet_mnemonic=  Recovery phrase to use for the reward wallet, default is randomly generated.')
+    print('--mode=master/observer     Mode stakepool is initialised to. observer mode requires configurl to be specified, default:master.')
+    print('--configurl=url            Url to pull the stakepool config file from when initialising for observer mode.')
 
 
 def main():
