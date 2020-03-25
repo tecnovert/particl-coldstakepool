@@ -28,7 +28,7 @@ Update Particl Core:
 Output should end (if successful) with lines similar to:
 
     particld --version
-    Particl Core Daemon version v0.18.0.10.0-110683551
+    Particl Core Daemon version v0.18.1.3.2-ecea0356a
 
 ## 3. Restart the pool
 
@@ -42,20 +42,20 @@ Verify if everything is running correctly:
 ```
 $ ~/particl-binaries/particl-cli -datadir=${HOME}/stakepoolDemoLive getnetworkinfo
 {
-  "version": 18001000,
-  "subversion": "/Satoshi:0.18.0.10/",
+  "version": 18010302,
+  "subversion": "/Satoshi:0.18.1.3.2/",
 (..)
 ```
 
 ```
 $ tail -n 1000 ~/stakepoolDemoLive/stakepool/stakepool.log | grep version
-19-06-25_03-27-36	coldstakepool-run, version: 0.0.10
-19-06-25_03-27-51	Particl Core version 18001000
+20-03-25_13-58-46	coldstakepool-run, version: 0.0.15
+20-03-25_13-58-56	Particl Core version 18010302
 ```
 
 In your browser, open `http://stakepoolvpsip:900/json/version`, you should see this:
 
-    {"pool": "0.0.10", "core": "18001000"}
+    {"core": "18010302", "pool": "0.0.15"}
 
 ----
 
