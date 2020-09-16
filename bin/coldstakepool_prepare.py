@@ -61,10 +61,10 @@ PARTICLD = os.getenv('PARTICLD', 'particld')
 PARTICL_TX = os.getenv('PARTICL_TX', 'particl-tx')
 PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
 
-PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.18.1.6')
+PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.19.1.1')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
 PARTICL_ARCH = os.getenv('PARTICL_ARCH', 'x86_64-linux-gnu.tar.gz')
-PARTICL_REPO = os.getenv('PARTICL_REPO', 'particl')
+PARTICL_REPO = os.getenv('PARTICL_REPO', 'tecnovert')
 
 
 def startDaemon(nodeDir, bindir):

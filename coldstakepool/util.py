@@ -17,7 +17,7 @@ from xmlrpc.client import (
     Transport,
     Fault,
 )
-from .segwit_addr import bech32_decode, convertbits, bech32_encode
+from .contrib.segwit_addr import bech32_decode, convertbits, bech32_encode
 
 
 WRITE_TO_LOG_FILE = True
