@@ -314,6 +314,7 @@ def main():
         fp.write(chain_id + 'wallet=pool_stake\n')
         fp.write(chain_id + 'wallet=pool_reward\n')
 
+        fp.write('txindex=1\n')
         fp.write('csindex=1\n')
         fp.write('addressindex=1\n')
 
