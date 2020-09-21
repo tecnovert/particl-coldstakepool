@@ -4,16 +4,17 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
-import sys
 import os
-import time
-import datetime as dt
-import decimal
+import sys
 import zmq
-import threading
-import traceback
+import time
 import plyvel
 import struct
+import decimal
+import datetime as dt
+import threading
+import traceback
+
 from functools import wraps
 from . import __version__
 from .util import (
@@ -29,6 +30,9 @@ from .util import (
     logmt,
     logm,
 )
+
+from .chainparams import is_script_prefix
+
 
 DEBUG = True
 CURRENT_DB_VERSION = 1
@@ -830,9 +834,10 @@ class StakePool():
     def getAddressSummary(self, address_str):
         rv = {}
 
-        # TODO: bech32 decode and test chain
+        # TODO: bech32 decode
         address = decodeAddress(address_str)
-        if address is None or len(address) != 33:
+        if address is None \
+           or len(address) != 33 and not is_script_prefix(address[0]):
             raise ValueError('Invalid address')
 
         db = plyvel.DB(self.dbPath)
