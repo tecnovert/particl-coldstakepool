@@ -81,6 +81,7 @@ class StakePool():
         self.settings = settings
         self.core_version = None  # Set during start()
         self.daemon_running = False
+        self.rpc_auth = None
 
         self.blockBuffer = 100  # Work n blocks from the tip to avoid forks, should be > COINBASE_MATURITY
 
@@ -186,7 +187,6 @@ class StakePool():
         with open(authcookiepath) as fp:
             self.rpc_auth = fp.read()
 
-        # Todo: Read rpc port from .conf file
         self.rpc_port = settings.get('rpcport', 51735 if self.chain == 'mainnet' else 51935)
 
     def start(self):

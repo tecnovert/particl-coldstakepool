@@ -9,12 +9,12 @@
 
 import os
 import sys
-import unittest
 import json
+import shutil
+import logging
+import unittest
 from io import StringIO
 from unittest.mock import patch
-import logging
-import shutil
 
 import bin.coldstakepool_prepare as prepareSystem
 

@@ -303,7 +303,8 @@ def main():
         sys.stderr.write('Error: %s exists, exiting.' % (daemonConfFile))
         exit(1)
 
-    zmq_port = 207922 if chain == 'mainnet' else 208922
+    zmq_port = 207922 if chain == 'mainnet' else 208922 if chain == 'testnet' else 209922
+    rpc_port = 51735 if chain == 'mainnet' else 51935 if chain == 'testnet' else 51936
     with open(daemonConfFile, 'w') as fp:
         if chain != 'mainnet':
             fp.write(chain + '=1\n\n')
@@ -395,6 +396,7 @@ def main():
         'rewardaddress': pool_reward_address,
         'zmqhost': 'tcp://127.0.0.1',
         'zmqport': zmq_port,
+        'rpcport': rpc_port,
         'htmlhost': 'localhost',
         'htmlport': html_port,
         'parameters': [
