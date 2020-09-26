@@ -20,7 +20,7 @@ import urllib.request
 import multiprocessing
 from unittest.mock import patch
 
-from coldstakepool.util import callrpc, dumpj, COIN
+from coldstakepool.util import callrpc, COIN
 from coldstakepool.contrib.rpcauth import generate_salt, password_to_hmac
 
 import bin.coldstakepool_prepare as prepareSystem
@@ -235,7 +235,7 @@ class Test(unittest.TestCase):
             callnoderpc(i, 'walletsettings', ['stakingoptions', {'stakecombinethreshold': 100, 'stakesplitthreshold': 200}])
 
         # Start pool daemon
-        self.daemons.append(startDaemon(os.path.join(TEST_DIR, 'csp_regtest'), PARTICL_BINDIR, PARTICLD, opts=['-noprinttoconsole', ]))
+        self.daemons.append(startDaemon(os.path.join(TEST_DIR, 'csp_regtest'), PARTICL_BINDIR, PARTICLD, opts=['-noprinttoconsole', '-stakethreadconddelayms=1000']))
         logging.info('Started %s %d', PARTICLD, self.daemons[-1].pid)
 
         self.processes.append(multiprocessing.Process(target=self.run_pool, args=(testargs,)))
@@ -389,7 +389,7 @@ class Test(unittest.TestCase):
             callrpc(pool_rpc_port, pool_rpc_auth, 'sendrawtransaction', [txhex])
             callnoderpc(1, 'sendrawtransaction', [txhex])
 
-        logging.info('Mining a block from node1 to confirm txns from node0 to pool')
+        logging.info('Staking a block from node1 to confirm txns from node0 to pool')
         callnoderpc(1, 'reservebalance', [False], wallet='')
         callnoderpc(1, 'walletsettings', ['stakelimit', {'height': 1}], wallet='')
 
@@ -399,6 +399,7 @@ class Test(unittest.TestCase):
             if r['blocks'] > 0:
                 break
             time.sleep(1)
+        assert(r['blocks'] > 0)
 
         # Send coin from node1 to pool
         txid = callnoderpc(1, 'sendtypeto', ['part', 'part', outputs_node1], wallet='')
@@ -406,19 +407,24 @@ class Test(unittest.TestCase):
 
         staking_options['enabled'] = True
         rv = callrpc(pool_rpc_port, pool_rpc_auth, 'walletsettings', ['stakingoptions', staking_options], wallet='pool_stake')
-        print('walletsettings', dumpj(rv))
 
         stake_blocks = 150
         rv = callrpc(pool_rpc_port, pool_rpc_auth, 'walletsettings', ['stakelimit', {'height': stake_blocks}], wallet='pool_stake')
 
+        logging.info('Pool staking to block %d', stake_blocks)
         addr_node_1 = callnoderpc(1, 'getnewaddress', wallet='')
         for i in range(600):
             r = callrpc(pool_rpc_port, pool_rpc_auth, 'getblockchaininfo')
             logging.info('blocks: %d', r['blocks'])
             if r['blocks'] >= stake_blocks:
                 break
+
+            # Add some fees
+            if i < 20:
+                rv = callnoderpc(0, 'sendtoaddress', [addr_node_1, 0.1], wallet='')
             time.sleep(1)
 
+        # Wait for pool to be synced to chain
         for i in range(30):
             with urllib.request.urlopen('http://localhost:9001/json') as conn:
                 pool_end = json.loads(conn.read().decode('utf8'))
@@ -452,16 +458,16 @@ class Test(unittest.TestCase):
         logging.info('total_addr_pending: %d', total_addr_pending)
         logging.info('total_addr_paid: %d', total_addr_paid)
 
-        total_pool_users = total_addr_accum + total_addr_pending + total_addr_paid
+        total_pool_users = total_addr_accum // COIN + total_addr_pending + total_addr_paid
         logging.info('accum_block_rewards: %d', accum_block_rewards)
 
         logging.info('poolrewardtotal: %d', pool_end['poolrewardtotal'])
-        total_pool_users = total_pool_users // COIN
+        total_pool_users = total_pool_users
         total_pool = total_pool_users + pool_end['poolrewardtotal']
         logging.info('total_pool_users + pool_reward: %d', total_pool)
         assert(abs(accum_block_rewards - total_pool) < 10)
 
-        changeaddress = {'address_standard': ms_addr['address']}
+        changeaddress = {'coldstakingaddress': addr_pool_stake, 'address_standard': ms_addr['address']}
         callnoderpc(0, 'walletsettings', ['changeaddress', changeaddress], wallet='MS Wallet')
 
         addr_out = callnoderpc(1, 'getnewaddress', wallet='')
@@ -476,7 +482,11 @@ class Test(unittest.TestCase):
         change_n = 1 if tx['vout'][0]['scriptPubKey']['addresses'][0] == addr_out else 0
         assert(tx['vout'][change_n]['scriptPubKey']['addresses'][0] == ms_addr['address'])
 
-        callnoderpc(0, 'sendrawtransaction', [stx2['hex']])
+        addr_pool_stake_plain = callnoderpc(0, 'validateaddress', [addr_pool_stake, True])['base58_address']
+        assert(tx['vout'][change_n]['scriptPubKey']['stakeaddresses'][0] == addr_pool_stake_plain)
+
+        txid = callnoderpc(0, 'sendrawtransaction', [stx2['hex']])
+        logging.info('Spent from ms addr in tx: %s', txid)
 
 
 if __name__ == '__main__':
