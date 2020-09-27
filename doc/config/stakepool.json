@@ -29,6 +29,10 @@
     "poolownerwithdrawal": {
         "frequency": 720,
         "address": "...",
+        "destinations": {
+            "address_1": 30,
+            "address_2": 70
+        },
         "reserve": 2,
         "threshold": 5
     }

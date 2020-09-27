@@ -140,13 +140,23 @@ class StakePool():
             try:
                 self.min_blocks_between_withdrawals = self.settings['poolownerwithdrawal']['frequency']
                 assert(self.min_blocks_between_withdrawals > self.blockBuffer)
-                self.owner_withdrawal_addr = self.settings['poolownerwithdrawal']['address']
-                assert(self.settings['poolownerwithdrawal']['reserve'] >= 0.005)
+                numset = 0
+                if 'address' in self.settings['poolownerwithdrawal']:
+                    address = self.settings['poolownerwithdrawal']['address']
+                    self.owner_withdrawal_dests = {address: 100}
+                    numset += 1
+                if 'destinations' in self.settings['poolownerwithdrawal']:
+                    self.owner_withdrawal_dests = self.settings['poolownerwithdrawal']['destinations']
+                    numset += 1
+                if numset != 1:
+                    raise ValueError('"address" or "destinations" must be set')
+                assert(self.settings['poolownerwithdrawal']['reserve'] >= 0.0005)
                 assert(self.settings['poolownerwithdrawal']['threshold'] >= 0.0)
                 self.have_withdrawal_info = True
-            except Exception:
+            except Exception as e:
                 traceback.print_exc()
                 self.have_withdrawal_info = False
+                logmt(self.fp, 'Error setting pool withdrawal info: ' + str(e))
 
             # If pool was synced in observer mode 'pool_fees_detected' may be higher than 'pool_fees'
             # 'pool_fees_detected' is tracked at chain tip - buffer, while 'pool_fees' is tracked as the pool makes transactions
@@ -288,14 +298,24 @@ class StakePool():
 
         if self.have_withdrawal_info:
             try:
-                r = callrpc(self.rpc_port, self.rpc_auth, 'validateaddress', [self.owner_withdrawal_addr])
-                assert(r['isvalid'] is True)
-            except Exception:
+                dests = []
+                for address, weight in self.owner_withdrawal_dests.items():
+                    assert(isinstance(weight, int))
+                    assert(weight > -1)
+                    r = callrpc(self.rpc_port, self.rpc_auth, 'validateaddress', [address])
+                    assert(r['isvalid'] is True)
+                    if address in dests:
+                        raise ValueError('Pool reward withdrawal destinations must be unique.')
+                    dests.append(address)
+            except Exception as e:
                 self.have_withdrawal_info = False
-                logmt(self.fp, 'Warning: Invalid \'owner_withdrawal_addr\'.')
+                logmt(self.fp, 'Warning: Invalid \'owner_withdrawal_dests\': ' + str(e))
 
         if self.have_withdrawal_info:
-            logmt(self.fp, 'Withdraw pool rewards to address: %s.\nMin blocks between withdrawals:%d' % (self.owner_withdrawal_addr, self.min_blocks_between_withdrawals))
+            logmt(self.fp, 'Withdraw pool rewards to destinations:')
+            for address, weight in self.owner_withdrawal_dests.items():
+                logmt(self.fp, '{}: {}'.format(address, weight))
+            logmt(self.fp, 'Min blocks between withdrawals: {}'.format(self.min_blocks_between_withdrawals))
         else:
             logmt(self.fp, 'Withdraw pool rewards to address: Disabled.')
 
@@ -700,7 +720,7 @@ class StakePool():
                 self.setBatched(dbkey, addrReward.to_bytes(16, 'big') + addrPending.to_bytes(8, 'big') + addrPaidout.to_bytes(8, 'big') + n[32:], b, batchBalances)
 
                 if self.debug:
-                    logmt(self.fp, 'Payout to %s: %s %d %s.\n' % (address, txid, out['n'], format8(v)))
+                    logmt(self.fp, 'Payout to %s: %s %d %s.' % (address, txid, out['n'], format8(v)))
 
             if totalDisbursed > 0:
                 b.put(bytes([DBT_POOL_PAYOUT]) + struct.pack('>i', height) + bytes.fromhex(txid), totalDisbursed.to_bytes(8, 'big'))
@@ -771,7 +791,7 @@ class StakePool():
             return
 
         try:
-            withdraw_amount = format8(decimal.Decimal(pool_reward_bal - reserve) * COIN)
+            withdraw_amount = decimal.Decimal(pool_reward_bal - reserve) * COIN
 
             # Send change back to the pool reward address for easier tracking by observers
             opts = {
@@ -782,12 +802,27 @@ class StakePool():
             if self.tx_fee_per_kb is not None:
                 opts['feeRate'] = self.tx_fee_per_kb
 
-            outputs = [{'address': self.owner_withdrawal_addr, 'amount': withdraw_amount}]
+            dest_pairs = []
+            total_weight = 0
+            for address, weight in self.owner_withdrawal_dests.items():
+                dest_pairs.append([address, withdraw_amount * weight])
+                total_weight += weight
+
+            if total_weight < 1:
+                logm(self.fp, 'Error: Reward withdrawal destinations weight sum is zero.')
+                return
+
+            outputs = []
+            for withdraw_pair in dest_pairs:
+                amount = format8(withdraw_pair[1] // total_weight)
+                outputs.append({'address': withdraw_pair[0], 'amount': amount})
+                logmt(self.fp, 'Withdrawing %s to: %s' % (amount, withdraw_pair[0]))
+
             ro = callrpc(self.rpc_port, self.rpc_auth, 'sendtypeto',
                          ['part', 'part', outputs, '', '', 4, 64, False, opts], 'pool_reward')
 
             txfee = int(decimal.Decimal(ro['fee']) * COIN)
-            logmt(self.fp, 'Withdrawing %s to %s in tx: %s\n' % (withdraw_amount, self.owner_withdrawal_addr, ro['txid']))
+            logmt(self.fp, 'Withdrew %s in tx: %s\n' % (format8(withdraw_amount), ro['txid']))
 
             dbkey = bytes([DBT_DATA]) + b'pool_fees'
             n = db.get(dbkey)
@@ -796,8 +831,10 @@ class StakePool():
 
             if self.debug:
                 with open(os.path.join(self.debugDir, 'pool_withdrawals.csv'), 'a') as fp:
-                    fp.write('%d,%s,%d,%s,%s\n'
-                             % (height, ro['txid'], -1, self.owner_withdrawal_addr, withdraw_amount))
+                    for withdraw_pair in dest_pairs:
+                        amount = format8(withdraw_pair[1] // total_weight)
+                        fp.write('%d,%s,%d,%s,%s\n'
+                                 % (height, ro['txid'], -1, withdraw_pair[0], amount))
 
                 r = callrpc(self.rpc_port, self.rpc_auth, 'getwalletinfo', [], 'pool_reward')
                 logm(self.fp, 'Available balance after withdrawal %f' % (r['balance']))
