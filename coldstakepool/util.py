@@ -4,14 +4,12 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
-import os
 import time
-import decimal
-import subprocess
 import json
-import traceback
-import hashlib
 import urllib
+import decimal
+import hashlib
+import traceback
 import threading
 from xmlrpc.client import (
     Transport,
@@ -242,9 +240,9 @@ class Jsonrpc():
         """
 
 
-def callrpc(rpc_port, auth, method, params=[], wallet=None):
+def callrpc(rpc_port, auth, method, params=[], wallet=None, rpc_host='127.0.0.1'):
     try:
-        url = 'http://%s@127.0.0.1:%d/' % (auth, rpc_port)
+        url = 'http://{}@{}:{}/'.format(auth, rpc_host, rpc_port)
         if wallet is not None:
             url += 'wallet/' + urllib.parse.quote(wallet)
         x = Jsonrpc(url)
@@ -262,19 +260,12 @@ def callrpc(rpc_port, auth, method, params=[], wallet=None):
     return r['result']
 
 
-def callrpc_cli(bindir, datadir, chain, cmd):
-    command_cli = os.path.join(bindir, 'particl-cli')
+def make_rpc_func(rpc_host, rpc_port, rpc_auth):
+    rpc_host = rpc_host
+    rpc_port = rpc_port
+    rpc_auth = rpc_auth
 
-    args = command_cli + ('' if chain == 'mainnet' else ' -' + chain) + ' -datadir=' + datadir + ' ' + cmd
-    p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    out = p.communicate()
-
-    if len(out[1]) > 0:
-        raise ValueError('RPC error ' + str(out[1]))
-
-    r = out[0].decode('utf-8').strip()
-    try:
-        r = json.loads(r)
-    except Exception:
-        pass
-    return r
+    def rpc_func(method, params=None, wallet=None):
+        nonlocal rpc_host, rpc_port, rpc_auth
+        return callrpc(rpc_port, rpc_auth, method, params, wallet, rpc_host=rpc_host)
+    return rpc_func

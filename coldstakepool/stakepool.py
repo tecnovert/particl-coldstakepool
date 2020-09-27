@@ -19,7 +19,7 @@ from functools import wraps
 from . import __version__
 from .util import (
     COIN,
-    callrpc,
+    make_rpc_func,
     decodeAddress,
     encodeAddress,
     format8,
@@ -189,15 +189,21 @@ class StakePool():
         self.db_version = 0 if n is None else struct.unpack('>i', n)[0]
         db.close()
 
-        # Wait for daemon to start
-        authcookiepath = os.path.join(self.particlDataDir, '' if self.chain == 'mainnet' else self.chain, '.cookie')
-        for i in range(10):
-            if not os.path.exists(authcookiepath):
-                time.sleep(0.5)
-        with open(authcookiepath) as fp:
-            self.rpc_auth = fp.read()
+        self.rpc_host = self.settings.get('rpchost', '127.0.0.1')
+        if 'rpcauth' in self.settings:
+            self.rpc_auth = self.settings['rpcauth']
+        else:
+            # Wait for daemon to start
+            authcookiepath = os.path.join(self.particlDataDir, '' if self.chain == 'mainnet' else self.chain, '.cookie')
+            for i in range(10):
+                if not os.path.exists(authcookiepath):
+                    time.sleep(0.5)
+            with open(authcookiepath) as fp:
+                self.rpc_auth = fp.read()
 
         self.rpc_port = settings.get('rpcport', 51735 if self.chain == 'mainnet' else 51935)
+
+        self.rpc_func = make_rpc_func(self.rpc_host, self.rpc_port, self.rpc_auth)
 
     def start(self):
         logmt(self.fp, 'Starting StakePool at height %d\nPool Address: %s, Reward Address: %s, Mode %s\n' % (self.poolHeight, self.poolAddr, self.poolAddrReward, self.mode))
@@ -205,7 +211,7 @@ class StakePool():
         self.upgradeDatabase(self.db_version)
         self.waitForDaemonRPC()
 
-        self.core_version = callrpc(self.rpc_port, self.rpc_auth, 'getnetworkinfo')['version']
+        self.core_version = self.rpc_func('getnetworkinfo')['version']
         logmt(self.fp, 'Particl Core version %s\n' % (self.core_version))
 
         if self.mode == 'master':
@@ -254,7 +260,7 @@ class StakePool():
             if not self.is_running:
                 return
             try:
-                callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_stake')
+                self.rpc_func('walletsettings', ['stakingoptions'], 'pool_stake')
                 return
             except Exception as ex:
                 traceback.print_exc()
@@ -265,7 +271,7 @@ class StakePool():
 
     def runSanityChecks(self):
         try:
-            r = callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_stake')
+            r = self.rpc_func('walletsettings', ['stakingoptions'], 'pool_stake')
             options = r['stakingoptions']
             reset_stakingoptions = False
             if not isinstance(options, dict):
@@ -283,13 +289,13 @@ class StakePool():
                     options['smsgfeeratetarget'] = self.smsg_fee_rate_target
                 else:
                     options.pop('smsgfeeratetarget', None)
-                callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions', options], 'pool_stake')
+                self.rpc_func('walletsettings', ['stakingoptions', options], 'pool_stake')
 
         except Exception:
             logmt(self.fp, 'Warning: \'pool_stake\' wallet reward address isn\'t set!')
 
         try:
-            r = callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_reward')
+            r = self.rpc_func('walletsettings', ['stakingoptions'], 'pool_reward')
             if r['stakingoptions']['enabled'] is not False:
                 if r['stakingoptions']['enabled'].lower() != 'false':
                     logmt(self.fp, 'Warning: Staking is not disabled on the \'pool_reward\' wallet!')
@@ -302,7 +308,7 @@ class StakePool():
                 for address, weight in self.owner_withdrawal_dests.items():
                     assert(isinstance(weight, int))
                     assert(weight > -1)
-                    r = callrpc(self.rpc_port, self.rpc_auth, 'validateaddress', [address])
+                    r = self.rpc_func('validateaddress', [address])
                     assert(r['isvalid'] is True)
                     if address in dests:
                         raise ValueError('Pool reward withdrawal destinations must be unique.')
@@ -346,7 +352,7 @@ class StakePool():
     def processBlock(self, height):
         logmt(self.fp, 'processBlock height %d' % (height))
 
-        reward = callrpc(self.rpc_port, self.rpc_auth, 'getblockreward', [height, ])
+        reward = self.rpc_func('getblockreward', [height, ])
 
         db = plyvel.DB(self.dbPath, create_if_missing=True)
 
@@ -411,7 +417,7 @@ class StakePool():
     def processPoolBlock(self, height, reward, db, b, batchBalances):
         logmt(self.fp, 'Found block at ' + str(height))
         opts = {'mature_only': True, 'all_staked': True}
-        outputs = callrpc(self.rpc_port, self.rpc_auth, 'listcoldstakeunspent', [self.poolAddr, height - 1, opts])
+        outputs = self.rpc_func('listcoldstakeunspent', [self.poolAddr, height - 1, opts])
 
         totals = dict()
         poolCoinTotal = 0
@@ -455,7 +461,7 @@ class StakePool():
             date = dt.datetime.fromtimestamp(int(reward['blocktime'])).strftime('%Y-%m')
         else:
             # TODO: Remove
-            blockinfo = callrpc(self.rpc_port, self.rpc_auth, 'getblockheader', [reward['blockhash']])
+            blockinfo = self.rpc_func('getblockheader', [reward['blockhash']])
             date = dt.datetime.fromtimestamp(int(blockinfo['time'])).strftime('%Y-%m')
 
         dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
@@ -556,7 +562,7 @@ class StakePool():
             return
 
         # Safety check to prevent double paying if resyncing the chain in master mode
-        ro = callrpc(self.rpc_port, self.rpc_auth, 'getblockchaininfo')
+        ro = self.rpc_func('getblockchaininfo')
         if ro['blocks'] >= self.poolHeight + self.blockBuffer + 5:
             logmt(self.fp, 'Warning: Pool height is below node height, skipping disbursement, %d, %d.\n' % (self.poolHeight, ro['blocks']))
             return
@@ -577,8 +583,8 @@ class StakePool():
             if self.tx_fee_per_kb is not None:
                 opts['feeRate'] = self.tx_fee_per_kb
 
-            ro = callrpc(self.rpc_port, self.rpc_auth, 'sendtypeto',
-                         ['part', 'part', sl, '', '', 4, 64, False, opts], 'pool_reward')
+            ro = self.rpc_func('sendtypeto',
+                               ['part', 'part', sl, '', '', 4, 64, False, opts], 'pool_reward')
 
             txfees += int(decimal.Decimal(ro['fee']) * COIN)
             txns.append(ro['txid'])
@@ -625,7 +631,7 @@ class StakePool():
             'start': height,
             'end': height,
         }
-        ro = callrpc(self.rpc_port, self.rpc_auth, 'getaddressdeltas', [opts, ])
+        ro = self.rpc_func('getaddressdeltas', [opts, ])
 
         txids = set()
         for delta in ro:
@@ -639,14 +645,14 @@ class StakePool():
             return
 
         for txid in txids:
-            ro = callrpc(self.rpc_port, self.rpc_auth, 'getrawtransaction', [txid, True])
+            ro = self.rpc_func('getrawtransaction', [txid, True])
 
             have_blinded = False
             total_input_value = 0
             total_output_value = 0
             for n, inp in enumerate(ro['vin']):
                 try:
-                    ri = callrpc(self.rpc_port, self.rpc_auth, 'getrawtransaction', [inp['txid'], True])
+                    ri = self.rpc_func('getrawtransaction', [inp['txid'], True])
                     prevout = ri['vout'][inp['vout']]
                     if prevout['type'] == 'blind':
                         have_blinded = True
@@ -763,7 +769,7 @@ class StakePool():
 
         b.put(bytes([DBT_DATA]) + b'last_withdrawal_run', struct.pack('>i', height))
 
-        r = callrpc(self.rpc_port, self.rpc_auth, 'getwalletinfo', [], 'pool_reward')
+        r = self.rpc_func('getwalletinfo', wallet='pool_reward')
 
         n = db.get(bytes([DBT_POOL_BAL]) + decodeAddress(self.poolAddrReward))
         pool_reward = 0 if n is None else int.from_bytes(n, 'big')
@@ -785,7 +791,7 @@ class StakePool():
         if r['balance'] <= reserve or pool_reward_bal < reserve + threshold:
             return
 
-        ro = callrpc(self.rpc_port, self.rpc_auth, 'getblockchaininfo')
+        ro = self.rpc_func('getblockchaininfo')
         if ro['blocks'] >= self.poolHeight + self.blockBuffer + 5:
             logmt(self.fp, 'Warning: Pool height is below node height, skipping withdrawal, %d, %d.\n' % (self.poolHeight, ro['blocks']))
             return
@@ -818,8 +824,8 @@ class StakePool():
                 outputs.append({'address': withdraw_pair[0], 'amount': amount})
                 logmt(self.fp, 'Withdrawing %s to: %s' % (amount, withdraw_pair[0]))
 
-            ro = callrpc(self.rpc_port, self.rpc_auth, 'sendtypeto',
-                         ['part', 'part', outputs, '', '', 4, 64, False, opts], 'pool_reward')
+            ro = self.rpc_func('sendtypeto',
+                               ['part', 'part', outputs, '', '', 4, 64, False, opts], 'pool_reward')
 
             txfee = int(decimal.Decimal(ro['fee']) * COIN)
             logmt(self.fp, 'Withdrew %s in tx: %s\n' % (format8(withdraw_amount), ro['txid']))
@@ -836,7 +842,7 @@ class StakePool():
                         fp.write('%d,%s,%d,%s,%s\n'
                                  % (height, ro['txid'], -1, withdraw_pair[0], amount))
 
-                r = callrpc(self.rpc_port, self.rpc_auth, 'getwalletinfo', [], 'pool_reward')
+                r = self.rpc_func('getwalletinfo', wallet='pool_reward')
                 logm(self.fp, 'Available balance after withdrawal %f' % (r['balance']))
 
         except Exception:
@@ -851,7 +857,7 @@ class StakePool():
             if message == b'hashblock':
                 message = self.zmqSubscriber.recv()
                 seq = self.zmqSubscriber.recv()
-                r = callrpc(self.rpc_port, self.rpc_auth, 'getblockchaininfo')
+                r = self.rpc_func('getblockchaininfo')
                 while r['blocks'] - self.blockBuffer > self.poolHeight and self.is_running:
                     self.processBlock(self.poolHeight + 1)
                     if limit_blocks < 0:
@@ -890,8 +896,8 @@ class StakePool():
 
         db.close()
 
-        utxos = callrpc(self.rpc_port, self.rpc_auth, 'listunspent',
-                        [1, 9999999, [address_str, ], True, {'include_immature': True}], 'pool_stake')
+        utxos = self.rpc_func('listunspent',
+                              [1, 9999999, [address_str, ], True, {'include_immature': True}], 'pool_stake')
 
         totalCoinCurrent = 0
         for utxo in utxos:
@@ -921,7 +927,7 @@ class StakePool():
                 k, v = next(it)
                 foundblock = (struct.unpack('>i', k[1:])[0], v[:32].hex(), int.from_bytes(v[32:40], 'big'), int.from_bytes(v[40:48], 'big'))
 
-                blockinfo = callrpc(self.rpc_port, self.rpc_auth, 'getblockheader', [foundblock[1]])
+                blockinfo = self.rpc_func('getblockheader', [foundblock[1]])
                 date = dt.datetime.fromtimestamp(int(blockinfo['time'])).strftime('%Y-%m')
 
                 dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
@@ -943,8 +949,8 @@ class StakePool():
                 k, v = next(it)
                 found_payment = (struct.unpack('>i', k[1:5])[0], int.from_bytes(v[:8], 'big'))
 
-                blockhash = callrpc(self.rpc_port, self.rpc_auth, 'getblockhash', [found_payment[0]])
-                blockinfo = callrpc(self.rpc_port, self.rpc_auth, 'getblockheader', [blockhash])
+                blockhash = self.rpc_func('getblockhash', [found_payment[0]])
+                blockinfo = self.rpc_func('getblockheader', [blockhash])
                 date = dt.datetime.fromtimestamp(int(blockinfo['time'])).strftime('%Y-%m')
 
                 dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
@@ -1046,13 +1052,13 @@ class StakePool():
         rv['lastpayments'] = lastPayments
 
         try:
-            stakinginfo = callrpc(self.rpc_port, self.rpc_auth, 'getstakinginfo', [], 'pool_stake')
+            stakinginfo = self.rpc_func('getstakinginfo', wallet='pool_stake')
             rv['stakeweight'] = stakinginfo['weight']
         except Exception:
             rv['stakeweight'] = 0
 
         try:
-            walletinfo = callrpc(self.rpc_port, self.rpc_auth, 'getwalletinfo', [], 'pool_stake')
+            walletinfo = self.rpc_func('getwalletinfo', wallet='pool_stake')
             rv['watchonlytotalbalance'] = walletinfo['watchonly_total_balance']
             rv['stakedbalance'] = walletinfo['watchonly_staked_balance']
         except Exception:

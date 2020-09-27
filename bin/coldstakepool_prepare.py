@@ -52,7 +52,7 @@ import tarfile
 import subprocess
 import urllib.request
 from coldstakepool.util import (
-    callrpc_cli,
+    make_rpc_func,
 )
 
 
@@ -65,6 +65,8 @@ PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.19.1.2')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
 PARTICL_ARCH = os.getenv('PARTICL_ARCH', 'x86_64-linux-gnu.tar.gz')
 PARTICL_REPO = os.getenv('PARTICL_REPO', 'tecnovert')
+
+RPC_HOST = os.getenv('RPC_HOST', '127.0.0.1')
 
 
 def startDaemon(nodeDir, bindir):
@@ -194,6 +196,10 @@ def printHelp():
     print('--reward_wallet_mnemonic=  Recovery phrase to use for the reward wallet, default is randomly generated.')
     print('--mode=master/observer     Mode stakepool is initialised to. observer mode requires configurl to be specified, default:master.')
     print('--configurl=url            Url to pull the stakepool config file from when initialising for observer mode.')
+    print('--regtest                  Run Particl in regtest mode.')
+    print('--noprepare_binaries       Skip preparing core binaries.')
+    print('--noprepare_daemon         Skip preparing particl data dir.')
+    print('--rpcauth=                 RPC auth to connect to a running node.')
 
 
 def main():
@@ -204,6 +210,10 @@ def main():
     configurl = None
     stake_wallet_mnemonic = None
     reward_wallet_mnemonic = None
+    prepare_binaries = True
+    prepare_daemon = True
+    rpc_auth = None
+    rpc_auth_specified = False
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
@@ -238,6 +248,12 @@ def main():
         if name == 'regtest':
             chain = 'regtest'
             continue
+        if name == 'noprepare_binaries':
+            prepare_binaries = False
+            continue
+        if name == 'noprepare_daemon':
+            prepare_daemon = False
+            continue
 
         if len(s) == 2:
             if name == 'datadir':
@@ -261,6 +277,10 @@ def main():
             if name == 'configurl':
                 configurl = s[1]
                 continue
+            if name == 'rpcauth':
+                rpc_auth = s[1]
+                rpc_auth_specified = True
+                continue
 
         print('Unknown argument', v)
 
@@ -268,66 +288,76 @@ def main():
         sys.stderr.write('observer mode requires configurl set\n')
         exit(1)
 
-    if not os.path.exists(PARTICL_BINDIR):
-        os.makedirs(PARTICL_BINDIR)
-
     # 1. Download and verify the specified version of particl-core
-    downloadParticlCore()
-    extractParticlCore()
+    if prepare_binaries:
+        if not os.path.exists(PARTICL_BINDIR):
+            os.makedirs(PARTICL_BINDIR)
+
+        downloadParticlCore()
+        extractParticlCore()
 
     dataDirWasNone = False
     if dataDir is None:
         dataDir = os.path.expanduser('~/.particl')
         dataDirWasNone = True
-
     if poolDir is None:
         if dataDirWasNone:
             poolDir = os.path.join(os.path.expanduser(dataDir), ('' if chain == 'mainnet' else chain), 'stakepool')
         else:
             poolDir = os.path.join(os.path.expanduser(dataDir), 'stakepool')
-
-    print('dataDir:', dataDir)
     print('poolDir:', poolDir)
     if chain != 'mainnet':
         print('chain:', chain)
 
-    if not os.path.exists(dataDir):
-        os.makedirs(dataDir)
-
-    if not os.path.exists(poolDir):
-        os.makedirs(poolDir)
-
     # 2. Create a particl.conf
-    daemonConfFile = os.path.join(dataDir, 'particl.conf')
-    if os.path.exists(daemonConfFile):
-        sys.stderr.write('Error: %s exists, exiting.' % (daemonConfFile))
-        exit(1)
+    if prepare_daemon:
+        print('dataDir:', dataDir)
 
-    zmq_port = 207922 if chain == 'mainnet' else 208922 if chain == 'testnet' else 209922
-    rpc_port = 51735 if chain == 'mainnet' else 51935 if chain == 'testnet' else 51936
-    with open(daemonConfFile, 'w') as fp:
-        if chain != 'mainnet':
-            fp.write(chain + '=1\n\n')
+        if not os.path.exists(dataDir):
+            os.makedirs(dataDir)
 
-        fp.write('zmqpubhashblock=tcp://127.0.0.1:%d\n' % (zmq_port))
+        daemonConfFile = os.path.join(dataDir, 'particl.conf')
+        if os.path.exists(daemonConfFile):
+            sys.stderr.write('Error: %s exists, exiting.' % (daemonConfFile))
+            exit(1)
 
-        chain_id = 'test.' if chain == 'testnet' else 'regtest.' if chain == 'regtest' else ''
-        fp.write(chain_id + 'wallet=pool_stake\n')
-        fp.write(chain_id + 'wallet=pool_reward\n')
+        zmq_port = 207922 if chain == 'mainnet' else 208922 if chain == 'testnet' else 209922
+        rpc_port = 51735 if chain == 'mainnet' else 51935 if chain == 'testnet' else 51936
+        with open(daemonConfFile, 'w') as fp:
+            if chain != 'mainnet':
+                fp.write(chain + '=1\n\n')
 
-        fp.write('txindex=1\n')
-        fp.write('csindex=1\n')
-        fp.write('addressindex=1\n')
+            fp.write('zmqpubhashblock=tcp://127.0.0.1:%d\n' % (zmq_port))
 
-    startDaemon(dataDir, PARTICL_BINDIR)
+            chain_id = 'test.' if chain == 'testnet' else 'regtest.' if chain == 'regtest' else ''
+            fp.write(chain_id + 'wallet=pool_stake\n')
+            fp.write(chain_id + 'wallet=pool_reward\n')
+
+            fp.write('txindex=1\n')
+            fp.write('csindex=1\n')
+            fp.write('addressindex=1\n')
+
+        startDaemon(dataDir, PARTICL_BINDIR)
+
+        authcookiepath = os.path.join(dataDir, '' if chain == 'mainnet' else chain, '.cookie')
+        for i in range(10):
+            if not os.path.exists(authcookiepath):
+                time.sleep(0.5)
+        with open(authcookiepath) as fp:
+            rpc_auth = fp.read()
+
+    rpc_func = make_rpc_func(RPC_HOST, rpc_port, rpc_auth)
 
     # Delay until responding
     for k in range(10):
         try:
-            callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'getblockchaininfo')
+            rpc_func('getblockchaininfo')
             break
         except Exception:
             time.sleep(0.5)
+
+    if not os.path.exists(poolDir):
+        os.makedirs(poolDir)
 
     try:
         if mode == 'observer':
@@ -341,12 +371,12 @@ def main():
             pool_stake_address = settings['pooladdress']
             pool_reward_address = settings['rewardaddress']
 
-            v = callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'validateaddress "%s"' % (pool_stake_address))
+            v = rpc_func('validateaddress', [pool_stake_address])
             assert('isvalid' in v)
             assert(v['isvalid'] is True)
 
-            callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake importaddress "%s"' % (v['address']))
-            callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward importaddress "%s"' % (pool_reward_address))
+            rpc_func('importaddress', [v['address']], wallet='pool_stake')
+            rpc_func('importaddress', [pool_reward_address], wallet='pool_reward')
 
             poolConfFile = os.path.join(poolDir, 'stakepool.json')
             if os.path.exists(poolConfFile):
@@ -360,29 +390,30 @@ def main():
 
         # 3. Generate and import a recovery phrase for both wallets.
         if stake_wallet_mnemonic is None:
-            stake_wallet_mnemonic = callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'mnemonic new')['mnemonic']
+            stake_wallet_mnemonic = rpc_func('mnemonic', ['new'])['mnemonic']
 
         if reward_wallet_mnemonic is None:
-            reward_wallet_mnemonic = callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'mnemonic new')['mnemonic']
+            reward_wallet_mnemonic = rpc_func('mnemonic', ['new'])['mnemonic']
 
-        callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake extkeyimportmaster "%s"' % (stake_wallet_mnemonic))
-        callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward extkeyimportmaster "%s"' % (reward_wallet_mnemonic))
+        rpc_func('extkeyimportmaster', [stake_wallet_mnemonic], wallet='pool_stake')
+        rpc_func('extkeyimportmaster', [reward_wallet_mnemonic], wallet='pool_reward')
 
         # 4. Generate the pool_stake_address from the staking wallet.
-        pool_stake_address = callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake getnewaddress')
-        pool_stake_address = callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake validateaddress %s true' % (pool_stake_address))['stakeonly_address']
+        pool_stake_address = rpc_func('getnewaddress', wallet='pool_stake')
+        pool_stake_address = rpc_func('validateaddress', [pool_stake_address, True], wallet='pool_stake')['stakeonly_address']
 
         # 5. Generate the pool_reward_address from the reward wallet.
-        pool_reward_address = callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward getnewaddress')
+        pool_reward_address = rpc_func('getnewaddress', wallet='pool_reward')
 
         # 6. Disable staking on the reward wallet.
-        callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward walletsettings stakingoptions "{\\"enabled\\":\\"false\\"}"')
+        rpc_func('walletsettings', ['stakingoptions', {'enabled': False}], wallet='pool_reward')
 
         # 7. Set the reward address of the staking wallet.
-        callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake walletsettings stakingoptions "{\\"rewardaddress\\":\\"%s\\"}"' % (pool_reward_address))
+        rpc_func('walletsettings', ['stakingoptions', {'rewardaddress': pool_reward_address}], wallet='pool_stake')
 
     finally:
-        callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'stop')
+        if prepare_daemon:
+            rpc_func('stop')
 
     # 8. Create the stakepool.json configuration file.
     html_port = 9000 if chain == 'mainnet' else 9001
@@ -394,7 +425,7 @@ def main():
         'startheight': 200000,  # Set to a block height before the pool begins operating
         'pooladdress': pool_stake_address,
         'rewardaddress': pool_reward_address,
-        'zmqhost': 'tcp://127.0.0.1',
+        'zmqhost': 'tcp://' + RPC_HOST,
         'zmqport': zmq_port,
         'rpcport': rpc_port,
         'htmlhost': 'localhost',
@@ -410,6 +441,11 @@ def main():
             },
         ]
     }
+
+    if rpc_auth_specified:
+        poolsettings['rpcauth'] = rpc_auth
+    if RPC_HOST != '127.0.0.1':
+        poolsettings['rpchost'] = RPC_HOST
 
     poolConfFile = os.path.join(poolDir, 'stakepool.json')
     if os.path.exists(poolConfFile):
