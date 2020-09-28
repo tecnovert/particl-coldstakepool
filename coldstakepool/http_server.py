@@ -65,6 +65,10 @@ class HttpHandler(BaseHTTPRequestHandler):
         settings['particlbindir'] = '...'
         settings['particldatadir'] = '...'
         settings['poolownerwithdrawal'] = '...'
+        settings['rpcauth'] = '...'
+        settings['rpchost'] = '...'
+        settings['zmqhost'] = '...'
+        settings['htmlhost'] = '...'
         settings.pop('management_key_salt', None)
         settings.pop('management_key_hash', None)
         return bytes(json.dumps(settings, indent=4), 'UTF-8')
