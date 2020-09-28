@@ -1,0 +1,34 @@
+version: '3.3'
+
+services:
+    particl_core:
+        image: i_particl_0.19.1.2
+        build:
+            context: particl_0.19.1.2
+            dockerfile: Dockerfile
+        container_name: particl_core
+        volumes:
+            - /var/data/particl:/data
+        ports:
+            - "51738:51738"
+        expose:
+            - 51735
+            - 20792
+        restart: unless-stopped
+    particl_stakepool:
+        image: i_particl_stakepool
+        build:
+            context: stakepool
+            dockerfile: Dockerfile
+        container_name: particl_stakepool
+        volumes:
+            - /var/data/stakepool:/data
+        ports:
+            - "9000:9000"
+        depends_on:
+            - particl_core
+        restart: unless-stopped
+networks:
+    default:
+        external:
+            name: stakepool_network

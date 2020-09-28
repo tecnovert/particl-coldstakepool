@@ -200,6 +200,7 @@ def printHelp():
     print('--noprepare_binaries       Skip preparing core binaries.')
     print('--noprepare_daemon         Skip preparing particl data dir.')
     print('--rpcauth=                 RPC auth to connect to a running node.')
+    print('--rescan_from=             Timestamp to rescan wallets from, -1 to disable.')
 
 
 def main():
@@ -214,6 +215,9 @@ def main():
     prepare_daemon = True
     rpc_auth = None
     rpc_auth_specified = False
+    rescan_from = 0
+    stake_mnemonic_passphrase = ''
+    reward_mnemonic_passphrase = ''
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != '-':
@@ -281,6 +285,9 @@ def main():
                 rpc_auth = s[1]
                 rpc_auth_specified = True
                 continue
+            if name == 'rescan_from':
+                rescan_from = int(s[1])
+                continue
 
         print('Unknown argument', v)
 
@@ -310,6 +317,8 @@ def main():
         print('chain:', chain)
 
     # 2. Create a particl.conf
+    zmq_port = 207922 if chain == 'mainnet' else 208922 if chain == 'testnet' else 209922
+    rpc_port = 51735 if chain == 'mainnet' else 51935 if chain == 'testnet' else 51936
     if prepare_daemon:
         print('dataDir:', dataDir)
 
@@ -321,8 +330,6 @@ def main():
             sys.stderr.write('Error: %s exists, exiting.' % (daemonConfFile))
             exit(1)
 
-        zmq_port = 207922 if chain == 'mainnet' else 208922 if chain == 'testnet' else 209922
-        rpc_port = 51735 if chain == 'mainnet' else 51935 if chain == 'testnet' else 51936
         with open(daemonConfFile, 'w') as fp:
             if chain != 'mainnet':
                 fp.write(chain + '=1\n\n')
@@ -350,11 +357,12 @@ def main():
 
     # Delay until responding
     for k in range(10):
+        time.sleep(1)
         try:
-            rpc_func('getblockchaininfo')
+            rpc_func('getwalletinfo', wallet='pool_stake')
             break
-        except Exception:
-            time.sleep(0.5)
+        except Exception as e:
+            pass
 
     if not os.path.exists(poolDir):
         os.makedirs(poolDir)
@@ -395,8 +403,8 @@ def main():
         if reward_wallet_mnemonic is None:
             reward_wallet_mnemonic = rpc_func('mnemonic', ['new'])['mnemonic']
 
-        rpc_func('extkeyimportmaster', [stake_wallet_mnemonic], wallet='pool_stake')
-        rpc_func('extkeyimportmaster', [reward_wallet_mnemonic], wallet='pool_reward')
+        rpc_func('extkeyimportmaster', [stake_wallet_mnemonic, stake_mnemonic_passphrase, False, 'pool_stake_key', 'pool_stake_acc', rescan_from], wallet='pool_stake')
+        rpc_func('extkeyimportmaster', [reward_wallet_mnemonic, reward_mnemonic_passphrase, False, 'pool_reward_key', 'pool_reward_acc', rescan_from], wallet='pool_reward')
 
         # 4. Generate the pool_stake_address from the staking wallet.
         pool_stake_address = rpc_func('getnewaddress', wallet='pool_stake')
