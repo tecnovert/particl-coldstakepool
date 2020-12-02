@@ -139,7 +139,7 @@ class StakePool():
         if self.mode == 'master':
             try:
                 self.min_blocks_between_withdrawals = self.settings['poolownerwithdrawal']['frequency']
-                assert(self.min_blocks_between_withdrawals > self.blockBuffer)
+                assert(self.min_blocks_between_withdrawals > self.blockBuffer), 'Bad frequency'
                 numset = 0
                 if 'address' in self.settings['poolownerwithdrawal']:
                     address = self.settings['poolownerwithdrawal']['address']
@@ -150,8 +150,8 @@ class StakePool():
                     numset += 1
                 if numset != 1:
                     raise ValueError('"address" or "destinations" must be set')
-                assert(self.settings['poolownerwithdrawal']['reserve'] >= 0.0005)
-                assert(self.settings['poolownerwithdrawal']['threshold'] >= 0.0)
+                assert(self.settings['poolownerwithdrawal']['reserve'] >= 0.0005), 'Low reserve'
+                assert(self.settings['poolownerwithdrawal']['threshold'] >= 0.0), 'Low threshold'
                 self.have_withdrawal_info = True
             except Exception as e:
                 traceback.print_exc()
@@ -797,7 +797,7 @@ class StakePool():
             return
 
         try:
-            withdraw_amount = decimal.Decimal(pool_reward_bal - reserve) * COIN
+            withdraw_amount = int(decimal.Decimal(pool_reward_bal - reserve) * COIN)
 
             # Send change back to the pool reward address for easier tracking by observers
             opts = {
@@ -820,7 +820,7 @@ class StakePool():
 
             outputs = []
             for withdraw_pair in dest_pairs:
-                amount = format8(withdraw_pair[1] // total_weight)
+                amount = format8(int(withdraw_pair[1]) // int(total_weight))
                 outputs.append({'address': withdraw_pair[0], 'amount': amount})
                 logmt(self.fp, 'Withdrawing %s to: %s' % (amount, withdraw_pair[0]))
 
@@ -838,7 +838,7 @@ class StakePool():
             if self.debug:
                 with open(os.path.join(self.debugDir, 'pool_withdrawals.csv'), 'a') as fp:
                     for withdraw_pair in dest_pairs:
-                        amount = format8(withdraw_pair[1] // total_weight)
+                        amount = format8(int(withdraw_pair[1]) // int(total_weight))
                         fp.write('%d,%s,%d,%s,%s\n'
                                  % (height, ro['txid'], -1, withdraw_pair[0], amount))
 
