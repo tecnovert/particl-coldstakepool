@@ -472,7 +472,6 @@ class StakePool():
 
         poolRewardClients = int(poolRewardClients)
         for k, v in totals.items():
-
             addrReward = int((poolRewardClients * COIN * v) // (poolCoinTotal))
             addrTotal = addrReward
 
@@ -698,9 +697,9 @@ class StakePool():
                     logmt(self.fp, 'Withdrawal detected from pool reward balance %s %d %s.\n' % (txid, out['n'], format8(v)))
 
                     dbkey = bytes([DBT_DATA]) + b'pool_withdrawn'
-                    n = db.get(dbkey)
+                    n = self.getBatched(dbkey, db, batchBalances)
                     poolWithdrawnTotal = v if n is None else v + int.from_bytes(n, 'big')
-                    b.put(dbkey, poolWithdrawnTotal.to_bytes(8, 'big'))
+                    self.setBatched(dbkey, poolWithdrawnTotal.to_bytes(8, 'big'), b, batchBalances)
 
                     if self.debug:
                         with open(os.path.join(self.debugDir, 'pool_withdrawals.csv'), 'a') as fp:
