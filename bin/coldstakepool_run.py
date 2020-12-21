@@ -33,8 +33,6 @@ from coldstakepool.util import (
 )
 
 ALLOW_CORS = True
-PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
-
 stakePool = None
 
 
@@ -55,13 +53,14 @@ def runStakePool(fp, dataDir, chain):
         settings = json.load(fs)
 
     stakePool = StakePool(fp, dataDir, settings, chain)
+    stakePool.start()
 
     threads = []
     if 'htmlhost' in settings:
         logmt(fp, 'Starting server at %s:%d.' % (settings['htmlhost'], settings['htmlport']))
-        allow_cors = settings['allowcors'] if 'allowcors' in settings else ALLOW_CORS
-        key_salt = settings['management_key_salt'] if 'management_key_salt' in settings else None
-        key_hash = settings['management_key_hash'] if 'management_key_hash' in settings else None
+        allow_cors = settings.get('allowcors', ALLOW_CORS)
+        key_salt = settings.get('management_key_salt', None)
+        key_hash = settings.get('management_key_hash', None)
         tS1 = HttpThread(fp, settings['htmlhost'], settings['htmlport'], allow_cors, stakePool, key_salt, key_hash)
         threads.append(tS1)
         tS1.start()
@@ -88,7 +87,7 @@ def printVersion():
 
 
 def printHelp():
-    print('coldstakepool-run.py --datadir=path -testnet')
+    print('coldstakepool-run --datadir=path -testnet')
 
 
 def main():
@@ -141,7 +140,7 @@ def main():
     if not os.path.exists(dataDir):
         os.makedirs(dataDir)
 
-    with open(os.path.join(dataDir, 'stakepool_log.txt'), 'w') as fp:
+    with open(os.path.join(dataDir, 'stakepool.log'), 'w') as fp:
         logmt(fp, os.path.basename(sys.argv[0]) + ', version: ' + __version__ + '\n\n')
         runStakePool(fp, dataDir, chain)
 

@@ -5,7 +5,7 @@ After=particld_test.service
 Requires=particld_test.service
 
 [Service]
-ExecStart=coldstakepool-run -datadir=~/stakepoolDemoTest/stakepool -testnet
+ExecStart=/usr/local/bin/coldstakepool-run -datadir=~/stakepoolDemoTest/stakepool -testnet
 TimeoutStopSec=30
 
 User=stakepooluser

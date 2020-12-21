@@ -57,15 +57,18 @@ from coldstakepool.util import (
 PARTICL_BINDIR = os.path.expanduser(os.getenv('PARTICL_BINDIR', '~/particl-binaries'))
 PARTICLD = os.getenv('PARTICLD', 'particld')
 PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
+PARTICL_TX = os.getenv('PARTICL_CLI', 'particl-tx')
 
-PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.17.1.3')
+PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.18.1.3')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
+PARTICL_ARCH = os.getenv('PARTICL_ARCH', 'x86_64-linux-gnu.tar.gz')
+PARTICL_REPO = os.getenv('PARTICL_REPO', 'particl')
 
 
 def startDaemon(nodeDir, bindir):
     command_cli = os.path.join(bindir, PARTICLD)
 
-    args = [command_cli, '-daemon', '-connect=0', '-datadir=' + nodeDir]
+    args = [command_cli, '-daemon', '-noconnect', '-nostaking', '-nodnsseed', '-datadir=' + nodeDir]
     p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out = p.communicate()
 
@@ -74,31 +77,46 @@ def startDaemon(nodeDir, bindir):
     return out[0]
 
 
-class AppPrepare():
-    def __init__(self, mode='normal', test_param=None):
-        # Validate and process argument options
-        self.parse_args(mode, test_param)
-        # Initialize database connection
-        self.app_name = self.get_app_name(self.name)
-
-
 def downloadParticlCore():
     print('Download and verify Particl core release.')
 
-    url_sig = 'https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-linux/tecnovert/particl-linux-%s' % (PARTICL_VERSION + PARTICL_VERSION_TAG, PARTICL_VERSION)
-    url_release = 'https://github.com/particl/particl-core/releases/download/v%s/particl-%s-x86_64-linux-gnu.tar.gz' % (PARTICL_VERSION + PARTICL_VERSION_TAG, PARTICL_VERSION)
+    if 'osx' in PARTICL_ARCH:
+        os_dir_name = 'osx-unsigned'
+        os_name = 'osx'
+    elif 'win32-setup' in PARTICL_ARCH or 'win64-setup' in PARTICL_ARCH:
+        os_dir_name = 'win-signed'
+        os_name = 'win-signer'
+    elif 'win32' in PARTICL_ARCH or 'win64' in PARTICL_ARCH:
+        os_dir_name = 'win-unsigned'
+        os_name = 'win'
+    else:
+        os_dir_name = 'linux'
+        os_name = 'linux'
 
-    assert_path = os.path.join(PARTICL_BINDIR, 'particl-linux-%s-build.assert' % (PARTICL_VERSION))
+    signing_key_fingerprint = '8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B'
+    signing_key_name = 'tecnovert'
+
+    if os_dir_name == 'win-signed':
+        assert_filename = 'particl-{}-build.assert'.format(os_name)
+    else:
+        assert_filename = 'particl-{}-{}-build.assert'.format(os_name, PARTICL_VERSION)
+
+    assert_url = 'https://raw.githubusercontent.com/%s/gitian.sigs/master/%s-%s/%s/%s' % (PARTICL_REPO, PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, signing_key_name, assert_filename)
+    assert_path = os.path.join(PARTICL_BINDIR, assert_filename)
+
+    release_filename = 'particl-{}-{}'.format(PARTICL_VERSION, PARTICL_ARCH)
+    release_url = 'https://github.com/%s/particl-core/releases/download/v%s/%s' % (PARTICL_REPO, PARTICL_VERSION + PARTICL_VERSION_TAG, release_filename)
+
     if not os.path.exists(assert_path):
-        subprocess.check_call(['wget', url_sig + '-build.assert', '-P', PARTICL_BINDIR])
+        subprocess.check_call(['wget', assert_url, '-P', PARTICL_BINDIR])
 
-    sig_path = os.path.join(PARTICL_BINDIR, 'particl-linux-%s-build.assert.sig' % (PARTICL_VERSION))
+    sig_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s-build.assert.sig' % (os_name, PARTICL_VERSION))
     if not os.path.exists(sig_path):
-        subprocess.check_call(['wget', url_sig + '-build.assert.sig?raw=true', '-O', sig_path])
+        subprocess.check_call(['wget', assert_url + '.sig?raw=true', '-O', sig_path])
 
-    packed_path = os.path.join(PARTICL_BINDIR, 'particl-%s-x86_64-linux-gnu.tar.gz' % (PARTICL_VERSION))
+    packed_path = os.path.join(PARTICL_BINDIR, release_filename)
     if not os.path.exists(packed_path):
-        subprocess.check_call(['wget', url_release, '-P', PARTICL_BINDIR])
+        subprocess.check_call(['wget', release_url, '-P', PARTICL_BINDIR])
 
     hasher = hashlib.sha256()
     with open(packed_path, 'rb') as fp:
@@ -113,12 +131,17 @@ def downloadParticlCore():
         else:
             print('Found release hash %s in assert file.' % (release_hash.hex()))
 
-    signing_key_fingerprint = '8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B'
     try:
         subprocess.check_call(['gpg', '--list-keys', signing_key_fingerprint])
     except Exception:
         print('Downloading release signing pubkey')
-        subprocess.check_call(['gpg', '--keyserver', 'hkp://subset.pool.sks-keyservers.net', '--recv-keys', signing_key_fingerprint])
+        keyservers = ['keyserver.ubuntu.com', 'hkp://subset.pool.sks-keyservers.net']
+        for ks in keyservers:
+            try:
+                subprocess.check_call(['gpg', '--keyserver', ks, '--recv-keys', signing_key_fingerprint])
+            except Exception:
+                continue
+            break
         subprocess.check_call(['gpg', '--list-keys', signing_key_fingerprint])
 
     try:
@@ -127,12 +150,15 @@ def downloadParticlCore():
         sys.stderr.write('Error: Signature verification failed!')
         exit(1)
 
-    daemon_path = os.path.join(PARTICL_BINDIR, PARTICLD)
-    subprocess.check_call(['tar', '-xvf', packed_path, '-C', PARTICL_BINDIR])
-    bin_path = os.path.join(PARTICL_BINDIR, 'particl-%s/bin/*' % (PARTICL_VERSION))
-    subprocess.check_call(['cp ' + bin_path + ' ' + PARTICL_BINDIR], shell=True)  # Will fail if particld is running
 
-    output = subprocess.check_output([daemon_path + ' --version'], shell=True)
+def extractParticlCore():
+    packed_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s' % (PARTICL_VERSION, PARTICL_ARCH))
+    daemon_path = os.path.join(PARTICL_BINDIR, PARTICLD)
+    bin_prefix = 'particl-%s/bin' % (PARTICL_VERSION)
+    subprocess.check_call(['tar', '-xvf', packed_path, '-C', PARTICL_BINDIR, '--strip-components', '2',
+                           os.path.join(bin_prefix, PARTICLD), os.path.join(bin_prefix, PARTICL_CLI), os.path.join(bin_prefix, PARTICL_TX)])
+
+    output = subprocess.check_output([daemon_path, '--version'])
     version = output.splitlines()[0].decode('utf-8')
     print('particld --version\n' + version)
     assert(PARTICL_VERSION in version)
@@ -144,8 +170,11 @@ def printVersion():
 
 
 def printHelp():
-    print('Usage: prepareSystem.py ')
-    print('\n--update_core              Download Particl core release and exit.')
+    print('Usage: coldstakepool-prepare ')
+    print('\n--help, -h                 Print help.')
+    print('\n--version, -v              Print version.')
+    print('\n--update_core              Download, verify and extract Particl core release and exit.')
+    print('\n--download_core            Download and verify Particl core release and exit.')
     print('\n--datadir=PATH             Path to Particl data directory, default:~/.particl.')
     print('\n--pooldir=PATH             Path to stakepool data directory, default:{datadir}/stakepool.')
     print('\n--mainnet                  Run Particl in mainnet mode.')
@@ -185,6 +214,10 @@ def main():
             printHelp()
             return 0
         if name == 'update_core':
+            downloadParticlCore()
+            extractParticlCore()
+            return 0
+        if name == 'download_core':
             downloadParticlCore()
             return 0
         if name == 'mainnet':
@@ -230,6 +263,7 @@ def main():
 
     # 1. Download and verify the specified version of particl-core
     downloadParticlCore()
+    extractParticlCore()
 
     dataDirWasNone = False
     if dataDir is None:
@@ -287,7 +321,7 @@ def main():
         if mode == 'observer':
             print('Preparing observer config.')
 
-            settings = json.load(urllib.request.urlopen(configurl))
+            settings = json.loads(urllib.request.urlopen(configurl).read().decode('utf-8'))
 
             settings['mode'] = 'observer'
             settings['particlbindir'] = PARTICL_BINDIR
@@ -301,8 +335,6 @@ def main():
 
             callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_stake importaddress "%s"' % (v['address']))
             callrpc_cli(PARTICL_BINDIR, dataDir, chain, '-rpcwallet=pool_reward importaddress "%s"' % (pool_reward_address))
-
-            callrpc_cli(PARTICL_BINDIR, dataDir, chain, 'stop')
 
             poolConfFile = os.path.join(poolDir, 'stakepool.json')
             if os.path.exists(poolConfFile):

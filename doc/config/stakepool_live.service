@@ -5,7 +5,7 @@ After=particld_live.service
 Requires=particld_live.service
 
 [Service]
-ExecStart=coldstakepool-run -datadir=~/stakepoolDemoLive/stakepool
+ExecStart=/usr/local/bin/coldstakepool-run -datadir=~/stakepoolDemoLive/stakepool
 TimeoutStopSec=30
 
 User=stakepooluser

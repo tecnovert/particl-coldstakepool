@@ -1,21 +1,8 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2018-2019 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
-
-"""
-Particl Stake Pool - Proof of concept
-
-Staking should be disabled in the rewards wallet:
-    particl-cli -rpcwallet=pool_reward walletsettings stakingoptions "{\\"enabled\\":\\"false\\"}"
-
-
-Dependencies:
-    $ pacman -S python-pyzmq python-plyvel
-
-"""
 
 import sys
 import os
@@ -28,6 +15,7 @@ import traceback
 import plyvel
 import struct
 from functools import wraps
+from . import __version__
 from .util import (
     COIN,
     callrpc,
@@ -87,23 +75,25 @@ class StakePool():
         self.fp = fp
         self.dataDir = dataDir
         self.settings = settings
+        self.core_version = None  # Set during start()
+        self.daemon_running = False
 
         self.blockBuffer = 100  # Work n blocks from the tip to avoid forks, should be > COINBASE_MATURITY
 
-        self.mode = settings['mode'] if 'mode' in settings else 'master'
+        self.mode = settings.get('mode', 'master')
         self.binDir = os.path.expanduser(settings['particlbindir'])
         self.particlDataDir = os.path.expanduser(settings['particldatadir'])
         self.chain = chain
-        self.debug = settings['debug'] if 'debug' in settings else DEBUG
+        self.debug = settings.get('debug', DEBUG)
 
         self.poolAddrHrp = 'pcs' if self.chain == 'mainnet' else 'tpcs'
 
         self.poolAddr = settings['pooladdress']
         self.poolAddrReward = settings['rewardaddress']
 
-        self.poolHeight = settings['startheight'] if 'startheight' in settings else 0
+        self.poolHeight = settings.get('startheight', 0)
 
-        self.maxOutputsPerTx = settings['maxoutputspertx'] if 'maxoutputspertx' in settings else 48
+        self.maxOutputsPerTx = settings.get('maxoutputspertx', 48)
 
         # Default parameters
         self.poolFeePercent = 2
@@ -114,12 +104,16 @@ class StakePool():
 
         self.minOutputValue = int(0.1 * COIN)  # Ignore any outputs of lower value when accumulating rewards
         self.tx_fee_per_kb = None
+        self.smsg_fee_rate_target = None
 
         self.dbPath = os.path.join(dataDir, 'stakepooldb')
 
         db = plyvel.DB(self.dbPath, create_if_missing=True)
         n = db.get(bytes([DBT_DATA]) + b'current_height')
-        if n is not None:
+        if n is None:
+            logmt(self.fp, 'First run\n')
+            db.put(bytes([DBT_DATA]) + b'db_version', struct.pack('>i', CURRENT_DB_VERSION))
+        else:
             self.poolHeight = struct.unpack('>i', n)[0]
 
         self.lastHeightParametersSet = -1
@@ -177,7 +171,7 @@ class StakePool():
             db.put(bytes([DBT_DATA]) + b'reward_addr', decodeAddress(self.poolAddrReward))
 
         n = db.get(bytes([DBT_DATA]) + b'db_version')
-        db_version = 0 if n is None else struct.unpack('>i', n)[0]
+        self.db_version = 0 if n is None else struct.unpack('>i', n)[0]
         db.close()
 
         # Wait for daemon to start
@@ -188,20 +182,21 @@ class StakePool():
         with open(authcookiepath) as fp:
             self.rpc_auth = fp.read()
 
-        # Todo: read rpc port from .conf file
-        self.rpc_port = settings['rpcport'] if 'rpcport' in settings else (51735 if self.chain == 'mainnet' else 51935)
+        # Todo: Read rpc port from .conf file
+        self.rpc_port = settings.get('rpcport', 51735 if self.chain == 'mainnet' else 51935)
 
-        self.upgradeDatabase(db_version)
-
+    def start(self):
         logmt(self.fp, 'Starting StakePool at height %d\nPool Address: %s, Reward Address: %s, Mode %s\n' % (self.poolHeight, self.poolAddr, self.poolAddrReward, self.mode))
 
+        self.upgradeDatabase(self.db_version)
         self.waitForDaemonRPC()
 
-        r = callrpc(self.rpc_port, self.rpc_auth, 'getnetworkinfo')
-        logmt(self.fp, 'Particl Core version %s\n' % (r['version']))
+        self.core_version = callrpc(self.rpc_port, self.rpc_auth, 'getnetworkinfo')['version']
+        logmt(self.fp, 'Particl Core version %s\n' % (self.core_version))
 
         if self.mode == 'master':
             self.runSanityChecks()
+        self.daemon_running = True
 
     def stopRunning(self, with_code=0):
         self.fail_code = with_code
@@ -233,33 +228,54 @@ class StakePool():
                     self.minOutputValue = int(p['minoutputvalue'] * COIN)
                 if 'txfeerate' in p:
                     self.tx_fee_per_kb = p['txfeerate']
+                self.smsg_fee_rate_target = p.get('smsgfeeratetarget', None)
+
+                if self.mode == 'master' and self.daemon_running:
+                    self.runSanityChecks()
 
                 self.lastHeightParametersSet = p['height']
 
     def waitForDaemonRPC(self):
-        for i in range(21):
-            if i == 20:
-                logmt(self.fp, 'Can\'t connect to daemon RPC, exiting.')
-                self.stopRunning(1)  # exit with error so systemd will try restart stakepool
+        for i in range(20):
+            if not self.is_running:
                 return
             try:
                 callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_stake')
-                break
+                return
             except Exception as ex:
                 traceback.print_exc()
                 logmt(self.fp, 'Can\'t connect to daemon RPC, trying again in %d second/s.' % (1 + i))
                 time.sleep(1 + i)
+        logmt(self.fp, 'Can\'t connect to daemon RPC, exiting.')
+        self.stopRunning(1)  # Exit with error so systemd will try restart stakepool
 
     def runSanityChecks(self):
         try:
             r = callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_stake')
-            if r['stakingoptions']['rewardaddress'] != self.poolAddrReward:
-                logmt(self.fp, 'Warning: Mismatched reward address!')
+            options = r['stakingoptions']
+            reset_stakingoptions = False
+            if not isinstance(options, dict):
+                options = dict()
+            if options.get('rewardaddress', None) != self.poolAddrReward:
+                logmt(self.fp, 'Warning: Incorrect reward address, updating to {}'.format(self.poolAddrReward))
+                reset_stakingoptions = True
+            if options.get('smsgfeeratetarget', None) != self.smsg_fee_rate_target:
+                logmt(self.fp, 'Warning: Incorrect smsg fee rate target, updating to {}'.format(self.smsg_fee_rate_target))
+                reset_stakingoptions = True
+
+            if reset_stakingoptions:
+                options['rewardaddress'] = self.poolAddrReward
+                if self.smsg_fee_rate_target is not None:
+                    options['smsgfeeratetarget'] = self.smsg_fee_rate_target
+                else:
+                    options.pop('smsgfeeratetarget', None)
+                callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions', options], 'pool_stake')
+
         except Exception:
             logmt(self.fp, 'Warning: \'pool_stake\' wallet reward address isn\'t set!')
 
-        r = callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_reward')
         try:
+            r = callrpc(self.rpc_port, self.rpc_auth, 'walletsettings', ['stakingoptions'], 'pool_reward')
             if r['stakingoptions']['enabled'] is not False:
                 if r['stakingoptions']['enabled'].lower() != 'false':
                     logmt(self.fp, 'Warning: Staking is not disabled on the \'pool_reward\' wallet!')
@@ -981,14 +997,12 @@ class StakePool():
         except Exception:
             pass
         it.close()
-
         db.close()
 
         rv['lastblocks'] = lastBlocks
         rv['pendingpayments'] = pendingPayments
         rv['lastpayments'] = lastPayments
 
-        # TODO: cache at height
         try:
             stakinginfo = callrpc(self.rpc_port, self.rpc_auth, 'getstakinginfo', [], 'pool_stake')
             rv['stakeweight'] = stakinginfo['weight']
@@ -1004,3 +1018,7 @@ class StakePool():
             rv['stakedbalance'] = 0
 
         return rv
+
+    def getVersions(self):
+        return {'pool': __version__,
+                'core': 'Unknown' if self.core_version is None else str(self.core_version)}

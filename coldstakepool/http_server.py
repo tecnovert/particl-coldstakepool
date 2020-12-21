@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 The Particl Core developers
+# Copyright (c) 2018-2019 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,6 +13,7 @@ import http.client
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from .util import (
     COIN,
+    makeInt,
     format8,
     format16,
 )
@@ -35,38 +35,24 @@ class HttpHandler(BaseHTTPRequestHandler):
         return bytes(error_str_json, 'UTF-8')
 
     def js_address(self, urlSplit):
-
         if len(urlSplit) < 4:
-            return self.js_error('Must specify address')
-
+            raise ValueError('Must specify address')
         address_str = urlSplit[3]
         stakePool = self.server.stakePool
-        try:
-            return bytes(json.dumps(stakePool.getAddressSummary(address_str)), 'UTF-8')
-        except Exception as e:
-            return self.js_error(str(e))
+        return bytes(json.dumps(stakePool.getAddressSummary(address_str)), 'UTF-8')
 
     def js_metrics(self, urlSplit):
         stakePool = self.server.stakePool
         if len(urlSplit) > 3:
             code_str = urlSplit[3]
-            hashed = hashlib.sha256(str(code_str + self.management_key_salt).encode('utf-8')).hexdigest()
-            if not hashed == self.management_key_hash:
-                return self.js_error('Unknown argument')
-            try:
-                return bytes(json.dumps(stakePool.rebuildMetrics()), 'UTF-8')
-            except Exception as e:
-                return self.js_error(str(e))
-        try:
-            return bytes(json.dumps(stakePool.getMetrics()), 'UTF-8')
-        except Exception as e:
-            return self.js_error(str(e))
+            hashed = hashlib.sha256(str(code_str + self.server.management_key_salt).encode('utf-8')).hexdigest()
+            if not hashed == self.server.management_key_hash:
+                raise ValueError('Unknown argument')
+            return bytes(json.dumps(stakePool.rebuildMetrics()), 'UTF-8')
+        return bytes(json.dumps(stakePool.getMetrics()), 'UTF-8')
 
     def js_index(self, urlSplit):
-        try:
-            return bytes(json.dumps(self.server.stakePool.getSummary()), 'UTF-8')
-        except Exception as e:
-            return self.js_error(str(e))
+        return bytes(json.dumps(self.server.stakePool.getSummary()), 'UTF-8')
 
     def page_config(self, urlSplit):
         settings_path = os.path.join(self.server.stakePool.dataDir, 'stakepool.json')
@@ -114,8 +100,25 @@ class HttpHandler(BaseHTTPRequestHandler):
                 + '<tr><td>Current Total in Pool:</td><td>' + format8(summary['currenttotal']) + '</td></tr>' \
                 + '</table>'
 
-        content += '<p><a href=\'/\'>home</a></p>' \
-            + '</body></html>'
+        content += '<p><a href=\'/\'>home</a></p></body></html>'
+        return bytes(content, 'UTF-8')
+
+    def page_version(self):
+        try:
+            versions = self.server.stakePool.getVersions()
+        except Exception as e:
+            return self.page_error(str(e))
+
+        content = '<!DOCTYPE html><html lang="en">\n<head>' \
+            + '<meta charset="UTF-8">' \
+            + '<title>Particl Stake Pool Demo</title></head>' \
+            + '<body>' \
+            + '<h2>Particl Stake Pool Demo</h2>' \
+            + '<p>' \
+            + 'Pool Version: ' + versions['pool'] + '<br/>' \
+            + 'Core Version: ' + versions['core'] + '<br/>' \
+            + '</p>' \
+            + '<p><a href=\'/\'>home</a></p></body></html>'
         return bytes(content, 'UTF-8')
 
     def page_index(self):
@@ -138,8 +141,12 @@ class HttpHandler(BaseHTTPRequestHandler):
             + 'Stake Bonus: ' + str(stakePool.stakeBonusPercent) + '%<br/>' \
             + 'Payout Threshold: ' + format8(stakePool.payoutThreshold) + '<br/>' \
             + 'Blocks Between Payment Runs: ' + str(stakePool.minBlocksBetweenPayments) + '<br/>' \
-            + 'Minimum output value: ' + format8(stakePool.minOutputValue) + '<br/>' \
-            + '</p><p>' \
+            + 'Minimum output value: ' + format8(stakePool.minOutputValue) + '<br/>'
+
+        if stakePool.smsg_fee_rate_target is not None:
+            content += 'SMSG fee rate target: ' + format8(makeInt(stakePool.smsg_fee_rate_target)) + '<br/>'
+
+        content += '</p><p>' \
             + 'Synced Height: ' + str(summary['poolheight']) + '<br/>' \
             + 'Blocks Found: ' + str(summary['blocksfound']) + '<br/>' \
             + 'Total Disbursed: ' + format8(summary['totaldisbursed']) + '<br/>' \
@@ -171,17 +178,18 @@ class HttpHandler(BaseHTTPRequestHandler):
         content += '</body></html>'
         return bytes(content, 'UTF-8')
 
-    '''
+    """
     def page_help(self):
-        + '<h3>Help</h3>' \
-        + '<p>' \
-        + '</p>' \
-
-        + '<form method="get" action="/address">' \
-        + "<input type='text' name='' />" \
-        + "<input type='submit' value='Go'/>" \
-        + '</form>' \
-    '''
+        content = '<!DOCTYPE html><html lang="en">\n<head>' \
+            + '<meta charset="UTF-8">' \
+            + '<title>Particl Stake Pool Demo</title></head>' \
+            + '<body>' \
+            + '<h2>Particl Stake Pool Demo</h2>' \
+            + '<h3>Help</h3>' \
+            + '<p>' \
+            + '</p></body></html>'
+        return bytes(content, 'UTF-8')
+    """
 
     def putHeaders(self, status_code, content_type):
         self.send_response(status_code)
@@ -196,17 +204,25 @@ class HttpHandler(BaseHTTPRequestHandler):
             if urlSplit[1] == 'address':
                 self.putHeaders(status_code, 'text/html')
                 return self.page_address(urlSplit)
+            if urlSplit[1] == 'version':
+                self.putHeaders(status_code, 'text/html')
+                return self.page_version()
             if urlSplit[1] == 'config':
                 self.putHeaders(status_code, 'text/plain')
                 return self.page_config(urlSplit)
             if urlSplit[1] == 'json':
                 self.putHeaders(status_code, 'text/plain')
-                if len(urlSplit) > 2:
-                    if urlSplit[2] == 'address':
-                        return self.js_address(urlSplit)
-                    if urlSplit[2] == 'metrics':
-                        return self.js_metrics(urlSplit)
-                return self.js_index(urlSplit)
+                try:
+                    if len(urlSplit) > 2:
+                        if urlSplit[2] == 'version':
+                            return bytes(json.dumps(self.server.stakePool.getVersions()), 'UTF-8')
+                        if urlSplit[2] == 'address':
+                            return self.js_address(urlSplit)
+                        if urlSplit[2] == 'metrics':
+                            return self.js_metrics(urlSplit)
+                    return self.js_index(urlSplit)
+                except Exception as e:
+                    return self.js_error(str(e))
 
         self.putHeaders(status_code, 'text/html')
         return self.page_index()
@@ -259,6 +275,7 @@ class HttpThread(threading.Thread, HTTPServer):
     def serve_forever(self):
         while not self.stopped():
             self.handle_request()
+        self.socket.close()
 
     def run(self):
         self.serve_forever()

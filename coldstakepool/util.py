@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2018-2019 The Particl Core developers
@@ -23,6 +22,7 @@ from .segwit_addr import bech32_decode, convertbits, bech32_encode
 
 WRITE_TO_LOG_FILE = True
 COIN = 100000000
+DCOIN = decimal.Decimal(COIN)
 mxLog = threading.Lock()
 
 
@@ -41,6 +41,10 @@ def logm(fp, s, tag='', printstd=True, writetofile=WRITE_TO_LOG_FILE):
 
 def logmt(fp, s, printstd=True, writetofile=WRITE_TO_LOG_FILE):
     logm(fp, time.strftime('%y-%m-%d_%H-%M-%S', time.localtime()) + '\t' + s, printstd=printstd, writetofile=writetofile)
+
+
+def makeInt(v):
+    return int(dquantize(decimal.Decimal(v) * DCOIN).quantize(decimal.Decimal(1)))
 
 
 def format8(i):
