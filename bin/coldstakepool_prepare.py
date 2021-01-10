@@ -7,7 +7,7 @@
 
 """
 
-Minimal example of starting a Particl stake pool.
+Minimal example to start a Particl stake pool.
 
 1. Download and verify a particl-core release.
 
@@ -41,8 +41,8 @@ coldstakepool-run.py -datadir=~/stakepoolDemoTest/stakepool -testnet
 
 """
 
-import sys
 import os
+import sys
 import mmap
 import time
 import json

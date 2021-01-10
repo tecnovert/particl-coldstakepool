@@ -1,28 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2019 The Particl Core developers
+# Copyright (c) 2018-2021 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
 Particl Stake Pool - Proof of concept
-
-Staking should be disabled in the rewards wallet:
-    particl-cli -rpcwallet=pool_reward walletsettings stakingoptions "{\\"enabled\\":\\"false\\"}"
-
-
-Dependencies:
-    $ pacman -S python-pyzmq python-plyvel
-
 """
 
-import sys
 import os
-import time
+import sys
 import json
-import traceback
+import time
 import signal
+import traceback
 
 from coldstakepool import __version__
 from coldstakepool.stakepool import StakePool

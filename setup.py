@@ -10,12 +10,12 @@ __version__ = re.search(
 setuptools.setup(
     name="coldstakepool",
     version=__version__,
-    author="The Particl Developers",
+    author="tecnovert",
     author_email="tecnovert@tecnovert.net",
     description="Particl cold-staking pool",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/particl/coldstakepool",
+    url="https://github.com/tecnovert/coldstakepool",
     packages=setuptools.find_packages(),
     include_package_data=True,
     classifiers=[
@@ -32,7 +32,5 @@ setuptools.setup(
             "coldstakepool-prepare=bin.coldstakepool_prepare:main",
             "coldstakepool-run=bin.coldstakepool_run:main",
         ]
-    },
-    test_suite="tests.coldstakepool.test_suite"
-
+    }
 )

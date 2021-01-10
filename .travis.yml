@@ -10,8 +10,10 @@ stages:
 env:
 before_install:
   - sudo apt-get install -y wget gnupg2
+install:
+  - travis_retry pip install tox
 script:
-  - python setup.py test
+  - tox
 after_success:
   - echo "End test"
 jobs:
@@ -27,7 +29,7 @@ jobs:
         - travis_retry pip install codespell==1.15.0
       before_script:
       script:
-        - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=coldstakepool/contrib,.eggs
-        - codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,gitianpubkeys,*.pyc,*mnemonics.py,coldstakepool/contrib
+        - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=coldstakepool/contrib,.eggs,.tox
+        - codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,.tox,gitianpubkeys,*.pyc,*mnemonics.py,coldstakepool/contrib
       after_success:
         - echo "End lint"
