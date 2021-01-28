@@ -39,10 +39,10 @@ services:
             - particl_stakepool
         environment:
             VIRTUAL_NETWORK: stakepool_network
-            VIRTUAL_HOST: <DOMAIN_HERE>
+            VIRTUAL_HOST: ${STAKEPOOL_GUI_HOST}
             VIRTUAL_SERVICE_NAME: "stakepool_gui"
-            LETSENCRYPT_HOST: <DOMAIN_HERE>
-            LETSENCRYPT_EMAIL: <EMAIL_HERE>
+            LETSENCRYPT_HOST: ${STAKEPOOL_GUI_HOST}
+            LETSENCRYPT_EMAIL: ${STAKEPOOL_GUI_EMAIL}
         restart: unless-stopped
 networks:
     default:
