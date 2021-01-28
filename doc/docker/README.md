@@ -9,7 +9,7 @@ $ docker-compose build
 Create the data directories and place particl.conf:
 ```
 $ sudo mkdir -p /var/data/{particl/wallets,stakepool}
-$ sudo cp particl_0.19.1.2/particl.conf /var/data/particl/particl.conf
+$ sudo cp particl_0.19.2.3/particl.conf /var/data/particl/particl.conf
 ```
 
 Create RPC auth details:

@@ -9,12 +9,13 @@ RUN set -ex \
     && apt-get install -qq --no-install-recommends ca-certificates dirmngr gosu gpg wget \
     && rm -rf /var/lib/apt/lists/*
 
-ENV PARTICL_VERSION 0.19.1.2
+ENV PARTICL_VERSION 0.19.2.3
+ENV PARTICL_REPO particl
 ENV PARTICL_FILE particl-${PARTICL_VERSION}-x86_64-linux-gnu_nousb.tar.gz
-ENV PARTICL_URL https://github.com/tecnovert/particl-core/releases/download/v${PARTICL_VERSION}/
-ENV PARTICL_SHA256 3ec5a9d0427004e86b1bc3ad53dc6a19f48e923d7263b0fda823c40cd9ef3bc9
-ENV PARTICL_ASC_URL https://raw.githubusercontent.com/tecnovert/gitian.sigs/master/${PARTICL_VERSION}-linux/tecnovert/particl-linux-${PARTICL_VERSION}-build.assert
-ENV PARTICL_SIG_URL https://raw.githubusercontent.com/tecnovert/gitian.sigs/master/${PARTICL_VERSION}-linux/tecnovert/particl-linux-${PARTICL_VERSION}-build.assert.sig
+ENV PARTICL_URL https://github.com/${PARTICL_REPO}/particl-core/releases/download/v${PARTICL_VERSION}/
+ENV PARTICL_SHA256 41d4fb33e395744d95b5ae7a4e1463ba5740442f26ba34f6e604e405b5530e5f
+ENV PARTICL_ASC_URL https://raw.githubusercontent.com/${PARTICL_REPO}/gitian.sigs/master/${PARTICL_VERSION}-linux/tecnovert/particl-linux-${PARTICL_VERSION}-build.assert
+ENV PARTICL_SIG_URL https://raw.githubusercontent.com/${PARTICL_REPO}/gitian.sigs/master/${PARTICL_VERSION}-linux/tecnovert/particl-linux-${PARTICL_VERSION}-build.assert.sig
 ENV PARTICL_PGP_KEY 8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B
 
 # install particl binaries
