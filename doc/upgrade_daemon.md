@@ -13,6 +13,10 @@ Shut down the pool and daemon (second line applies if you're running testnet ver
     sudo systemctl stop stakepool_live.service particld_live.service
     sudo systemctl stop stakepool_test.service particld_test.service
 
+Ensure all dependencies are installed:
+
+    sudo apt-get install libleveldb-dev
+
 ## 2. Update `coldstakepool` & `particld` to latest version
 
 a) Update the coldstakepool code:

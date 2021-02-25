@@ -14,7 +14,7 @@ Update your packages, install all dependencies:
 
 ```
 $ sudo apt-get update
-$ sudo apt-get install gnupg wget python3 git nginx tmux python3-zmq python3-pip lynx htop vim
+$ sudo apt-get install gnupg wget python3 git nginx tmux python3-zmq python3-pip lynx htop vim libleveldb-dev
 ```
 
 ## 2. Installation
