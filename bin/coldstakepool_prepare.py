@@ -47,6 +47,7 @@ import mmap
 import time
 import json
 import stat
+import base64
 import hashlib
 import tarfile
 import subprocess
@@ -105,18 +106,26 @@ def downloadParticlCore():
     else:
         assert_filename = 'particl-{}-{}-build.assert'.format(os_name, PARTICL_VERSION)
 
-    assert_url = 'https://raw.githubusercontent.com/%s/gitian.sigs/master/%s-%s/%s/%s' % (PARTICL_REPO, PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, signing_key_name, assert_filename)
+    assert_url = 'https://api.github.com/repos/{}/gitian.sigs/contents/{}-{}/{}/{}'.format(PARTICL_REPO, PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, signing_key_name, assert_filename)
     assert_path = os.path.join(PARTICL_BINDIR, assert_filename)
 
     release_filename = 'particl-{}-{}'.format(PARTICL_VERSION, PARTICL_ARCH)
     release_url = 'https://github.com/%s/particl-core/releases/download/v%s/%s' % (PARTICL_REPO, PARTICL_VERSION + PARTICL_VERSION_TAG, release_filename)
 
     if not os.path.exists(assert_path):
-        subprocess.check_call(['wget', assert_url, '-P', PARTICL_BINDIR])
+        print('assert_url', assert_url)
+        r = urllib.request.urlopen(assert_url)
+        rj = json.loads(r.read().decode('utf-8'))
+        with open(assert_path, 'wb') as fp:
+            fp.write(base64.b64decode(rj['content']))
 
     sig_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s-build.assert.sig' % (os_name, PARTICL_VERSION))
     if not os.path.exists(sig_path):
-        subprocess.check_call(['wget', assert_url + '.sig?raw=true', '-O', sig_path])
+        print('assert_url' + '.sig', assert_url + '.sig')
+        r = urllib.request.urlopen(assert_url + '.sig')
+        rj = json.loads(r.read().decode('utf-8'))
+        with open(sig_path, 'wb') as fp:
+            fp.write(base64.b64decode(rj['content']))
 
     packed_path = os.path.join(PARTICL_BINDIR, release_filename)
     if not os.path.exists(packed_path):
