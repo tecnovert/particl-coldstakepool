@@ -11,7 +11,6 @@ import time
 import plyvel
 import struct
 import decimal
-import datetime as dt
 import threading
 import traceback
 
@@ -458,11 +457,11 @@ class StakePool():
         b.put(dbkey, struct.pack('>i', blocksFound))
 
         if 'blocktime' in reward:
-            date = dt.datetime.fromtimestamp(int(reward['blocktime'])).strftime('%Y-%m')
+            date = time.strftime('%Y-%m', time.gmtime(int(reward['blocktime'])))
         else:
             # TODO: Remove
             blockinfo = self.rpc_func('getblockheader', [reward['blockhash']])
-            date = dt.datetime.fromtimestamp(int(blockinfo['time'])).strftime('%Y-%m')
+            date = time.strftime('%Y-%m', time.gmtime(int(blockinfo['time'])))
 
         dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
         month_metrics = unpackMonthMetrics(db.get(dbkey))
@@ -736,7 +735,7 @@ class StakePool():
                 pool_disbursed = totalDisbursed if n is None else totalDisbursed + int.from_bytes(n, 'big')
                 self.setBatched(dbkey, pool_disbursed.to_bytes(8, 'big'), b, batchBalances)
 
-                date = dt.datetime.fromtimestamp(int(ro['blocktime'])).strftime('%Y-%m')
+                date = time.strftime('%Y-%m', time.gmtime(int(ro['blocktime'])))
                 dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
                 m = self.getBatched(dbkey, db, batchBalances)
                 if m is not None:
@@ -927,7 +926,7 @@ class StakePool():
                 foundblock = (struct.unpack('>i', k[1:])[0], v[:32].hex(), int.from_bytes(v[32:40], 'big'), int.from_bytes(v[40:48], 'big'))
 
                 blockinfo = self.rpc_func('getblockheader', [foundblock[1]])
-                date = dt.datetime.fromtimestamp(int(blockinfo['time'])).strftime('%Y-%m')
+                date = time.strftime('%Y-%m', time.gmtime(int(blockinfo['time'])))
 
                 dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
                 month_metrics = unpackMonthMetrics(db.get(dbkey))
@@ -950,7 +949,7 @@ class StakePool():
 
                 blockhash = self.rpc_func('getblockhash', [found_payment[0]])
                 blockinfo = self.rpc_func('getblockheader', [blockhash])
-                date = dt.datetime.fromtimestamp(int(blockinfo['time'])).strftime('%Y-%m')
+                date = time.strftime('%Y-%m', time.gmtime(int(blockinfo['time'])))
 
                 dbkey = bytes([DBT_POOL_METRICS]) + bytes(date, 'UTF-8')
                 month_metrics = unpackMonthMetrics(db.get(dbkey))
@@ -1069,3 +1068,6 @@ class StakePool():
     def getVersions(self):
         return {'pool': __version__,
                 'core': 'Unknown' if self.core_version is None else str(self.core_version)}
+
+    def getVotingInfo(self):
+        return self.rpc_func('votehistory', [], 'pool_stake')

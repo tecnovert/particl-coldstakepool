@@ -1,5 +1,9 @@
 # Stakepool Release Notes
 
+## 0.20.0
+
+- Added Voting Settings page
+
 ## 0.0.18
 
 - Pool reward withdrawal to weighted addresses.

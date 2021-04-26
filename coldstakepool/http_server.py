@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2019 The Particl Core developers
+# Copyright (c) 2018-2021 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
 import json
+import time
+import decimal
 import hashlib
 import threading
-import decimal
 import http.client
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from .util import (
@@ -107,6 +108,30 @@ class HttpHandler(BaseHTTPRequestHandler):
         content += '<p><a href=\'/\'>home</a></p></body></html>'
         return bytes(content, 'UTF-8')
 
+    def page_voting_info(self, urlSplit):
+        try:
+            voting_settings = self.server.stakePool.getVotingInfo()
+        except Exception as e:
+            return self.page_error(str(e))
+
+        vote_settings_content = ''
+        for r in voting_settings:
+            set_at = time.strftime('%Y-%m-%d %H-%M-%S %z', time.gmtime(int(r['added'])))
+            vote_settings_content += '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>'.format(r['proposal'], r['option'], r['from_height'], r['to_height'], set_at)
+
+        content = '<!DOCTYPE html><html lang="en">\n<head>' \
+            + '<meta charset="UTF-8">' \
+            + '<title>Particl Stake Pool Voting Settings</title></head>' \
+            + '<style>table, th, td {border: 1px solid black;border-collapse: collapse;}</style>' \
+            + '<body>' \
+            + '<h2>Particl Stake Pool Voting Settings</h2>' \
+            + '<table>' \
+            + '<tr><th>Proposal</th><th>Option</th><th>Height From</th><th>Height To</th><th>Set At</th></tr>' \
+            + vote_settings_content \
+            + '</table>' \
+            + '<p><a href=\'/\'>home</a></p></body></html>'
+        return bytes(content, 'UTF-8')
+
     def page_version(self):
         try:
             versions = self.server.stakePool.getVersions()
@@ -115,9 +140,9 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         content = '<!DOCTYPE html><html lang="en">\n<head>' \
             + '<meta charset="UTF-8">' \
-            + '<title>Particl Stake Pool Demo</title></head>' \
+            + '<title>Particl Stake Pool Version</title></head>' \
             + '<body>' \
-            + '<h2>Particl Stake Pool Demo</h2>' \
+            + '<h2>Particl Stake Pool Version</h2>' \
             + '<p>' \
             + 'Pool Version: ' + versions['pool'] + '<br/>' \
             + 'Core Version: ' + versions['core'] + '<br/>' \
@@ -135,9 +160,9 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         content = '<!DOCTYPE html><html lang="en">\n<head>' \
             + '<meta charset="UTF-8">' \
-            + '<title>Particl Stake Pool Demo</title></head>' \
+            + '<title>Particl Stake Pool</title></head>' \
             + '<body>' \
-            + '<h2>Particl Stake Pool Demo</h2>' \
+            + '<h2>Particl Stake Pool</h2>' \
             + '<p>' \
             + 'Mode: ' + summary['poolmode'] + '<br/>' \
             + 'Pool Address: ' + stakePool.poolAddr + '<br/>' \
@@ -186,9 +211,9 @@ class HttpHandler(BaseHTTPRequestHandler):
     def page_help(self):
         content = '<!DOCTYPE html><html lang="en">\n<head>' \
             + '<meta charset="UTF-8">' \
-            + '<title>Particl Stake Pool Demo</title></head>' \
+            + '<title>Particl Stake Pool Help</title></head>' \
             + '<body>' \
-            + '<h2>Particl Stake Pool Demo</h2>' \
+            + '<h2>Particl Stake Pool Help</h2>' \
             + '<h3>Help</h3>' \
             + '<p>' \
             + '</p></body></html>'
@@ -205,12 +230,6 @@ class HttpHandler(BaseHTTPRequestHandler):
     def handle_http(self, status_code, path):
         urlSplit = self.path.split('/')
         if len(urlSplit) > 1:
-            if urlSplit[1] == 'address':
-                self.putHeaders(status_code, 'text/html')
-                return self.page_address(urlSplit)
-            if urlSplit[1] == 'version':
-                self.putHeaders(status_code, 'text/html')
-                return self.page_version()
             if urlSplit[1] == 'config':
                 self.putHeaders(status_code, 'text/plain')
                 return self.page_config(urlSplit)
@@ -218,17 +237,26 @@ class HttpHandler(BaseHTTPRequestHandler):
                 self.putHeaders(status_code, 'text/plain')
                 try:
                     if len(urlSplit) > 2:
-                        if urlSplit[2] == 'version':
-                            return bytes(json.dumps(self.server.stakePool.getVersions()), 'UTF-8')
                         if urlSplit[2] == 'address':
                             return self.js_address(urlSplit)
                         if urlSplit[2] == 'metrics':
                             return self.js_metrics(urlSplit)
+                        if urlSplit[2] == 'version':
+                            return bytes(json.dumps(self.server.stakePool.getVersions()), 'UTF-8')
+                        if urlSplit[2] == 'voting':
+                            return bytes(json.dumps(self.server.stakePool.getVotingInfo()), 'UTF-8')
                     return self.js_index(urlSplit)
                 except Exception as e:
                     return self.js_error(str(e))
-
-        self.putHeaders(status_code, 'text/html')
+            self.putHeaders(status_code, 'text/html')
+            if urlSplit[1] == 'address':
+                return self.page_address(urlSplit)
+            if urlSplit[1] == 'version':
+                return self.page_version()
+            if urlSplit[1] == 'voting':
+                return self.page_voting_info(urlSplit)
+        else:
+            self.putHeaders(status_code, 'text/html')
         return self.page_index()
 
     def do_GET(self):
@@ -268,7 +296,7 @@ class HttpThread(threading.Thread, HTTPServer):
         # Send fake request
         conn = http.client.HTTPConnection(self.hostName, self.portNo)
         conn.connect()
-        conn.request("GET", "/none")
+        conn.request('GET', '/none')
         response = conn.getresponse()
         data = response.read()
         conn.close()

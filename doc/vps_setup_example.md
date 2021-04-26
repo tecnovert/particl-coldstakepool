@@ -12,20 +12,16 @@ First login to your VPS, replace `stakepoolvps` with the correct IP address of y
 
 Update your packages, install all dependencies:
 
-```
-$ sudo apt-get update
-$ sudo apt-get install gnupg wget python3 git nginx tmux python3-zmq python3-pip lynx htop vim libleveldb-dev
-```
+    sudo apt-get update
+    sudo apt-get install gnupg wget python3 git nginx tmux python3-zmq python3-pip lynx htop vim libleveldb-dev
 
 ## 2. Installation
 
 Clone `coldstakepool` git repository and install it:
 
-```
-$ git clone https://github.com/particl/coldstakepool particl_stakepool
-$ cd particl_stakepool
-$ sudo pip3 install .
-```
+    git clone https://github.com/particl/coldstakepool particl_stakepool
+    cd particl_stakepool
+    sudo pip3 install .
 
 ### Testnet Pool
 
@@ -40,36 +36,30 @@ Reward address: poiXfkxxB5eeEgvL3MZN1pxPq9Bfwh7tEm
 
 Adjust the startheight parameter to a block before the pool began operating.  Earlier blocks won't be scanned by the pool:
 
-    $ vi ~/stakepoolDemoTest/stakepool/stakepool.json
+    vi ~/stakepoolDemoTest/stakepool/stakepool.json
 
 Copy over `systemd` service files to your system:
 
-```
-$ sudo cp ~/particl_stakepool/doc/config/*.service /etc/systemd/system
-$ sudo systemctl daemon-reload
-```
+    sudo cp ~/particl_stakepool/doc/config/*.service /etc/systemd/system
+    sudo systemctl daemon-reload
 
 Start and enable the services, so they start automatically at system boot:
 
-```
-$ sudo systemctl start particld_test.service stakepool_test.service
-$ sudo systemctl enable particld_test.service stakepool_test.service
-```
+    sudo systemctl start particld_test.service stakepool_test.service
+    sudo systemctl enable particld_test.service stakepool_test.service
 
 #### Verify all is running
 
-```
-$ sudo tail -f /var/log/syslog
-$ ~/particl-binaries/particl-cli -datadir=${HOME}/stakepoolDemoTest getblockchaininfo
-$ lynx localhost:9001
-```
+    sudo tail -f /var/log/syslog
+    ~/particl-binaries/particl-cli -datadir=${HOME}/stakepoolDemoTest getblockchaininfo
+    lynx localhost:9001
 
 
 ### Mainnet Pool
 
 Stop the testnet pool (if running):
 
-    $ sudo systemctl stop particld_test.service stakepool_test.service
+    sudo systemctl stop particld_test.service stakepool_test.service
 
 ```
 $ coldstakepool-prepare -datadir=~/stakepoolDemoLive
@@ -82,44 +72,34 @@ Reward address: PbXgDsRurjpCYXxNryin13h86ufks9zh6o
 
 Adjust the startheight parameter.
 
-    $ vi ~/stakepoolDemoLive/stakepool/stakepool.json
+    vi ~/stakepoolDemoLive/stakepool/stakepool.json
 
 Copy over `systemd` service files to your system:
 
-```
-$ sudo cp ~/particl_stakepool/doc/config/*.service /etc/systemd/system
-$ sudo systemctl daemon-reload
-```
+    sudo cp ~/particl_stakepool/doc/config/*.service /etc/systemd/system
+    sudo systemctl daemon-reload
 
 Start and enable the services, so they start automatically at system boot:
 
-```
-$ sudo systemctl start particld_live.service stakepool_live.service
-$ sudo systemctl enable particld_live.service stakepool_live.service
-```
+    sudo systemctl start particld_live.service stakepool_live.service
+    sudo systemctl enable particld_live.service stakepool_live.service
 
 #### Verify all is running
 
-```
-$ sudo tail -f /var/log/syslog
-$ ~/particl-binaries/particl-cli -datadir=${HOME}/stakepoolDemoLive getblockchaininfo
-$ lynx localhost:9000
-```
+    sudo tail -f /var/log/syslog
+    ~/particl-binaries/particl-cli -datadir=${HOME}/stakepoolDemoLive getblockchaininfo
+    lynx localhost:9000
 
 ## 3. Set up webserver
 
-```
-$ sudo rm /etc/nginx/sites-enabled/default
-$ sudo cp ~/particl_stakepool/doc/config/nginx_stakepool_forward.conf /etc/nginx/conf.d/
-```
+    sudo rm /etc/nginx/sites-enabled/default
+    sudo cp ~/particl_stakepool/doc/config/nginx_stakepool_forward.conf /etc/nginx/conf.d/
 
-    $ sudo nginx -t
+    sudo nginx -t
 
-```
-$ sudo systemctl stop nginx
-$ sudo systemctl start nginx
-$ sudo systemctl enable nginx
-```
+    sudo systemctl stop nginx
+    sudo systemctl start nginx
+    sudo systemctl enable nginx
 
 To test, browse to:
 
@@ -128,7 +108,7 @@ To test, browse to:
 
 Check that it all starts back up:
 
-    $ sudo reboot
+    sudo reboot
 
 ### Production config
 
@@ -138,12 +118,10 @@ The production configuration enables:
   - uses port 80
   - HTTPS / TLS support
 
-```
-$ mkdir /tmp/nginx
-$ sudo rm /etc/nginx/conf.d/nginx_stakepool_forward.conf
-$ sudo cp ~/particl_stakepool/doc/config/nginx_stakepool_production.conf /etc/nginx/conf.d/
-$ sudo systemctl restart nginx
-```
+    mkdir /tmp/nginx
+    sudo rm /etc/nginx/conf.d/nginx_stakepool_forward.conf
+    sudo cp ~/particl_stakepool/doc/config/nginx_stakepool_production.conf /etc/nginx/conf.d/
+    sudo systemctl restart nginx
 
 To test, browse to:
 
@@ -154,48 +132,38 @@ To test, browse to:
 
 Install NodeJS:
 
-```
-$ wget -qO- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | bash
-$ nvm install node
-```
+    wget -qO- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | bash
+    nvm install node
 
 Install yarn:
 
-```
-$ curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-$ echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-$ sudo apt-get update && sudo apt-get install yarn
-```
+    curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+    echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+    sudo apt-get update && sudo apt-get install yarn
 
 Clone & install fancy frontend
 
-```
-$ git clone https://github.com/gerlofvanek/particl-coldstakepool-front
-$ cd particl-coldstakepool-front
-$ yarn install
-$ yarn run build
-$ cp -R dist /var/www/html/pool
-```
+    git clone https://github.com/gerlofvanek/particl-coldstakepool-front
+    cd particl-coldstakepool-front
+    yarn install
+    yarn run build
+    cp -R dist /var/www/html/pool
 
 Setup a domain name: https://kerneltalks.com/howto/how-to-setup-domain-name-in-linux-server/
 
 Setup TLS:
 
-```
-$ sudo apt-get update
-$ sudo apt-get install software-properties-common
-$ sudo add-apt-repository ppa:certbot/certbot
-$ sudo apt-get update
-$ sudo apt-get install python-certbot-nginx
-```
+    sudo apt-get update
+    sudo apt-get install software-properties-common
+    sudo add-apt-repository ppa:certbot/certbot
+    sudo apt-get update
+    sudo apt-get install python-certbot-nginx
 
 Create the certificates, enter your domain name in the interactive wizard:
 
-    $ sudo certbot --nginx certonly
+    sudo certbot --nginx certonly
 
 Edit the `/etc/nginx/conf.d/nginx_stakepool_production.conf`, uncomment the 4 settings from the configuration that related to SSL & replace `example.com` with your domain name:
 
-```
-$ vi /etc/nginx/conf.d/nginx_stakepool_production.conf
-$ sudo systemctl restart nginx
-```
+    vi /etc/nginx/conf.d/nginx_stakepool_production.conf
+    sudo systemctl restart nginx

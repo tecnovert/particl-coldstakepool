@@ -3,13 +3,13 @@
 
 Shut down the pool and daemon (second line only applies if you're running testnet):
 
-    $ sudo systemctl stop stakepool_live.service particld_live.service
-    $ sudo systemctl stop stakepool_test.service particld_test.service
+    sudo systemctl stop stakepool_live.service particld_live.service
+    sudo systemctl stop stakepool_test.service particld_test.service
 
 
 Edit the height based parameters in stakepool.json
 
-    $ vi ~/stakepoolDemoLive/stakepool/stakepool.json
+    vi ~/stakepoolDemoLive/stakepool/stakepool.json
 
 
 For example, change:
@@ -61,8 +61,8 @@ You could also add a new object to parameters, that would apply from height:
 
 Start the pool/s back up (second line only applies if you're running testnet):
 
-    $ sudo systemctl start stakepool_live.service
-    $ sudo systemctl start stakepool_test.service
+    sudo systemctl start stakepool_live.service
+    sudo systemctl start stakepool_test.service
 
 
 Test the fee rate target is set:
