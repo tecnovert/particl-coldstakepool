@@ -85,6 +85,9 @@ def startDaemon(nodeDir, bindir):
 def downloadParticlCore():
     print('Download and verify Particl core release.')
 
+    if not os.path.exists(PARTICL_BINDIR):
+        os.makedirs(PARTICL_BINDIR)
+
     if 'osx' in PARTICL_ARCH:
         os_dir_name = 'osx-unsigned'
         os_name = 'osx'
