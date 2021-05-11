@@ -9,11 +9,11 @@ RUN set -ex \
     && apt-get install -qq --no-install-recommends ca-certificates dirmngr gosu gpg wget \
     && rm -rf /var/lib/apt/lists/*
 
-ENV PARTICL_VERSION 0.19.2.5
+ENV PARTICL_VERSION 0.19.2.8
 ENV PARTICL_REPO particl
 ENV PARTICL_FILE particl-${PARTICL_VERSION}-x86_64-linux-gnu_nousb.tar.gz
 ENV PARTICL_URL https://github.com/${PARTICL_REPO}/particl-core/releases/download/v${PARTICL_VERSION}/
-ENV PARTICL_SHA256 496dfa03c014a4066819ee132c25a96d775e415d86bf68a2cacec5cc2ff019f2
+ENV PARTICL_SHA256 62804177e809edda009138dc34b6c777a0dd67e12783a7321d406b17d590dad9
 ENV PARTICL_ASC_URL https://raw.githubusercontent.com/${PARTICL_REPO}/gitian.sigs/master/${PARTICL_VERSION}-linux/tecnovert/particl-linux-${PARTICL_VERSION}-build.assert
 ENV PARTICL_SIG_URL https://raw.githubusercontent.com/${PARTICL_REPO}/gitian.sigs/master/${PARTICL_VERSION}-linux/tecnovert/particl-linux-${PARTICL_VERSION}-build.assert.sig
 ENV PARTICL_PGP_KEY 8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B
