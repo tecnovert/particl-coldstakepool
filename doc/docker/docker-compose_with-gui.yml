@@ -2,9 +2,9 @@ version: '3.3'
 
 services:
     particl_core:
-        image: i_particl_0.19.2.8
+        image: i_particl_0.19.2.12
         build:
-            context: particl_0.19.2.8
+            context: particl_0.19.2.12
             dockerfile: Dockerfile
         container_name: particl_core
         volumes:
