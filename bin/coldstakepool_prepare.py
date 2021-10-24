@@ -48,6 +48,7 @@ import time
 import json
 import stat
 import base64
+import random
 import hashlib
 import tarfile
 import subprocess
@@ -151,8 +152,19 @@ def downloadParticlCore():
         subprocess.check_call(['gpg', '--list-keys', signing_key_fingerprint])
     except Exception:
         print('Downloading release signing pubkey')
-        keyservers = ['keyserver.ubuntu.com', 'hkp://subset.pool.sks-keyservers.net']
+        keyservers = [
+            'hkps://keys.openpgp.org',
+            'keyserver.ubuntu.com',
+            'keys.gnupg.net',
+            'pgp.mit.edu',
+            'keyserver.pgp.com',
+            'ha.pool.sks-keyservers.net',
+            'hkp://subset.pool.sks-keyservers.net:80'
+        ]
+
+        random.shuffle(keyservers)
         for ks in keyservers:
+            print('Trying {}'.format(ks))
             try:
                 subprocess.check_call(['gpg', '--keyserver', ks, '--recv-keys', signing_key_fingerprint])
             except Exception:
