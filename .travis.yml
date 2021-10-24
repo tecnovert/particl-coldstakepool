@@ -9,7 +9,7 @@ stages:
   - lint
 env:
 before_install:
-  - sudo apt-get install -y wget gnupg2
+  - sudo apt-get install -y wget gnupg2 libleveldb-dev
 install:
   - travis_retry pip install tox
 script:

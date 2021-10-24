@@ -11,6 +11,7 @@ lint_task:
 
 test_task:
   setup_script:
+    - apt-get update && apt-get install -y libleveldb-dev
     - pip install tox
   script:
     - tox
