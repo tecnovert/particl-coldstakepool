@@ -63,7 +63,7 @@ PARTICLD = os.getenv('PARTICLD', 'particld')
 PARTICL_TX = os.getenv('PARTICL_TX', 'particl-tx')
 PARTICL_CLI = os.getenv('PARTICL_CLI', 'particl-cli')
 
-PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.19.2.16')
+PARTICL_VERSION = os.getenv('PARTICL_VERSION', '0.19.2.18')
 PARTICL_VERSION_TAG = os.getenv('PARTICL_VERSION_TAG', '')
 PARTICL_ARCH = os.getenv('PARTICL_ARCH', 'x86_64-linux-gnu_nousb.tar.gz')
 PARTICL_REPO = os.getenv('PARTICL_REPO', 'particl')
@@ -441,7 +441,10 @@ def main():
         rpc_func('walletsettings', ['stakingoptions', {'enabled': False}], wallet='pool_reward')
 
         # 7. Set the reward address of the staking wallet.
-        rpc_func('walletsettings', ['stakingoptions', {'rewardaddress': pool_reward_address}], wallet='pool_stake')
+        rpc_func('walletsettings', ['stakingoptions', {'rewardaddress': pool_reward_address, 'minownedvalue': 0.1}], wallet='pool_stake')
+
+        # 8. Limit minimum stakeable output value
+        rpc_func('walletsettings', ['other', {'minownedvalue': 0.1}], wallet='pool_stake')
 
     finally:
         if prepare_daemon:
