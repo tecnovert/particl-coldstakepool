@@ -12,6 +12,7 @@ before_install:
   - sudo apt-get install -y wget gnupg2 libleveldb-dev
 install:
   - travis_retry pip install tox
+  - gpg --import releasepubkeys/particl_tecnovert.pgp
 script:
   - tox
 after_success:
@@ -30,6 +31,6 @@ jobs:
       before_script:
       script:
         - PYTHONWARNINGS="ignore" flake8 --ignore=E501,F841,W503 --exclude=coldstakepool/contrib,.eggs,.tox
-        - codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,.tox,gitianpubkeys,*.pyc,*mnemonics.py,coldstakepool/contrib
+        - codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,.tox,releasepubkeys,*.pyc,*mnemonics.py,coldstakepool/contrib
       after_success:
         - echo "End lint"
