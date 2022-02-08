@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2021 The Particl Core developers
+# Copyright (c) 2018-2022 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -110,10 +110,15 @@ def downloadParticlCore():
     else:
         assert_filename = 'particl-{}-{}-build.assert'.format(os_name, PARTICL_VERSION)
 
-    assert_url = 'https://api.github.com/repos/{}/gitian.sigs/contents/{}-{}/{}/{}'.format(PARTICL_REPO, PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, signing_key_name, assert_filename)
+    major_version = int(PARTICL_VERSION.split('.')[0])
+    if major_version >= 22:
+        assert_url = 'https://api.github.com/repos/{}/guix.sigs/contents/{}/{}/all.SHA256SUMS'.format(PARTICL_REPO, PARTICL_VERSION + PARTICL_VERSION_TAG, signing_key_name)
+    else:
+        assert_url = 'https://api.github.com/repos/{}/gitian.sigs/contents/{}-{}/{}/{}'.format(PARTICL_REPO, PARTICL_VERSION + PARTICL_VERSION_TAG, os_dir_name, signing_key_name, assert_filename)
     assert_path = os.path.join(PARTICL_BINDIR, assert_filename)
 
-    release_filename = 'particl-{}-{}'.format(PARTICL_VERSION, PARTICL_ARCH)
+    sep = '_' if major_version >= 22 and PARTICL_ARCH.startswith('nousb') else '-'
+    release_filename = 'particl-{}{}{}'.format(PARTICL_VERSION, sep, PARTICL_ARCH)
     release_url = 'https://github.com/%s/particl-core/releases/download/v%s/%s' % (PARTICL_REPO, PARTICL_VERSION + PARTICL_VERSION_TAG, release_filename)
 
     if not os.path.exists(assert_path):
@@ -126,7 +131,7 @@ def downloadParticlCore():
     sig_path = os.path.join(PARTICL_BINDIR, 'particl-%s-%s-build.assert.sig' % (os_name, PARTICL_VERSION))
     if not os.path.exists(sig_path):
         print('assert_url' + '.sig', assert_url + '.sig')
-        r = urllib.request.urlopen(assert_url + '.sig')
+        r = urllib.request.urlopen(assert_url + ('.asc' if major_version >= 22 else '.sig'))
         rj = json.loads(r.read().decode('utf-8'))
         with open(sig_path, 'wb') as fp:
             fp.write(base64.b64decode(rj['content']))
@@ -180,7 +185,9 @@ def downloadParticlCore():
 
 
 def extractParticlCore():
-    packed_path = os.path.join(PARTICL_BINDIR, 'particl-{}-{}'.format(PARTICL_VERSION, PARTICL_ARCH))
+    major_version = int(PARTICL_VERSION.split('.')[0])
+    sep = '_' if major_version >= 22 and PARTICL_ARCH.startswith('nousb') else '-'
+    packed_path = os.path.join(PARTICL_BINDIR, 'particl-{}{}{}'.format(PARTICL_VERSION, sep, PARTICL_ARCH))
     daemon_path = os.path.join(PARTICL_BINDIR, PARTICLD)
     bin_prefix = PARTICL_BINDIR
 
@@ -188,7 +195,10 @@ def extractParticlCore():
     with tarfile.open(packed_path) as ft:
         for b in bins:
             out_path = os.path.join(bin_prefix, b)
-            fi = ft.extractfile('{}-{}/bin/{}'.format('particl', PARTICL_VERSION, b))
+            addendum = ''
+            if major_version >= 22 and PARTICL_ARCH.startswith('nousb'):
+                addendum = '_nousb'
+            fi = ft.extractfile('particl-{}{}/bin/{}'.format(PARTICL_VERSION, addendum, b))
             with open(out_path, 'wb') as fout:
                 fout.write(fi.read())
             fi.close()
