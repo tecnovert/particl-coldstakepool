@@ -395,7 +395,7 @@ class Test(unittest.TestCase):
 
         for i in range(10):
             r = callnoderpc(0, 'getblockchaininfo')
-            print('btc1', r['blocks'])
+            print('node0 blocks', r['blocks'])
             if r['blocks'] > 0:
                 break
             time.sleep(1)

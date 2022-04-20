@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2020 The Particl Core developers
+# Copyright (c) 2018-2022 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import time
-import json
 import urllib
 import decimal
 import hashlib
@@ -16,6 +15,15 @@ from xmlrpc.client import (
     Fault,
 )
 from .contrib.segwit_addr import bech32_decode, convertbits, bech32_encode
+
+# Use system-compiled JSON lib if available, fallback to stdlib
+try:
+    import rapidjson as json
+except ImportError:
+    try:
+        import ujson as json
+    except ImportError:
+        import json
 
 
 WRITE_TO_LOG_FILE = True

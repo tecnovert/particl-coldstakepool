@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2021 The Particl Core developers
+# Copyright (c) 2018-2022 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
-import json
 import time
 import decimal
 import hashlib
@@ -14,6 +13,7 @@ import http.client
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from .util import (
     COIN,
+    json,
     makeInt,
     format8,
     format16,
@@ -51,6 +51,16 @@ class HttpHandler(BaseHTTPRequestHandler):
                 raise ValueError('Unknown argument')
             return bytes(json.dumps(stakePool.rebuildMetrics()), 'UTF-8')
         return bytes(json.dumps(stakePool.getMetrics()), 'UTF-8')
+
+    def js_pending(self, urlSplit):
+        stakePool = self.server.stakePool
+        if len(urlSplit) > 3:
+            code_str = urlSplit[3]
+            hashed = hashlib.sha256(str(code_str + self.server.management_key_salt).encode('utf-8')).hexdigest()
+            if not hashed == self.server.management_key_hash:
+                raise ValueError('Unknown argument')
+            return bytes(json.dumps(stakePool.getPending(True)), 'UTF-8')
+        return bytes(json.dumps(stakePool.getPending()), 'UTF-8')
 
     def js_index(self, urlSplit):
         return bytes(json.dumps(self.server.stakePool.getSummary()), 'UTF-8')
@@ -245,6 +255,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                             return bytes(json.dumps(self.server.stakePool.getVersions()), 'UTF-8')
                         if urlSplit[2] == 'voting':
                             return bytes(json.dumps(self.server.stakePool.getVotingInfo()), 'UTF-8')
+                        if urlSplit[2] == 'pending':
+                            return self.js_pending(urlSplit)
                     return self.js_index(urlSplit)
                 except Exception as e:
                     return self.js_error(str(e))

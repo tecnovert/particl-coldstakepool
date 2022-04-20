@@ -4,10 +4,11 @@ RUN groupadd -r stakepool_group && useradd -r -m -g stakepool_group stakepool_us
 
 RUN set -ex \
     && apt-get update \
-    && apt-get install -qq --no-install-recommends ca-certificates gosu \
+    && apt-get install -qq --no-install-recommends ca-certificates gosu libleveldb-dev libzmq3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget https://github.com/tecnovert/particl-coldstakepool/archive/master.zip && \
+RUN pip3 install rapidjson packaging && \
+    wget https://github.com/tecnovert/particl-coldstakepool/archive/master.zip && \
     unzip master.zip && \
     cd particl-coldstakepool-master && \
     python setup.py install

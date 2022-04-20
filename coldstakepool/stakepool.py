@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2019 The Particl Core developers
+# Copyright (c) 2018-2022 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
-import sys
 import zmq
 import time
 import plyvel
@@ -18,16 +17,16 @@ from functools import wraps
 from . import __version__
 from .util import (
     COIN,
-    make_rpc_func,
-    decodeAddress,
-    encodeAddress,
-    format8,
-    format16,
-    bech32Encode,
-    bech32Decode,
+    logm,
     dumpj,
     logmt,
-    logm,
+    format8,
+    format16,
+    bech32Decode,
+    bech32Encode,
+    decodeAddress,
+    encodeAddress,
+    make_rpc_func,
 )
 
 from .chainparams import is_script_prefix
@@ -98,6 +97,7 @@ class StakePool():
         self.poolHeight = settings.get('startheight', 0)
 
         self.maxOutputsPerTx = settings.get('maxoutputspertx', 48)
+        self.automatic_disbursement = settings.get('automatic_disbursement', True)
 
         # Default parameters
         self.poolFeePercent = 2
@@ -186,6 +186,8 @@ class StakePool():
 
         n = db.get(bytes([DBT_DATA]) + b'db_version')
         self.db_version = 0 if n is None else struct.unpack('>i', n)[0]
+
+        self.compact_db(db)
         db.close()
 
         self.rpc_host = self.settings.get('rpchost', '127.0.0.1')
@@ -324,6 +326,9 @@ class StakePool():
         else:
             logmt(self.fp, 'Withdraw pool rewards to address: Disabled.')
 
+        if not self.automatic_disbursement:
+            logmt(self.fp, 'WARNING: Automatic disbursement is disabled.')
+
     def upgradeDatabase(self, db_version):
         if db_version >= CURRENT_DB_VERSION:
             return
@@ -336,6 +341,12 @@ class StakePool():
         db = plyvel.DB(self.dbPath, create_if_missing=True)
         db.put(bytes([DBT_DATA]) + b'db_version', struct.pack('>i', CURRENT_DB_VERSION))
         db.close()
+
+    def compact_db(self, db):
+        start = time.time()
+        db.compact_range()
+        end = time.time()
+        logmt(self.fp, 'Compacted db in {}s'.format(end - start))
 
     def getBatched(self, key, db, batch_mirror):
         n = batch_mirror.get(key)
@@ -387,12 +398,12 @@ class StakePool():
                     try:
                         self.processPoolBlock(height, reward, db, b, batchBalances)
                     except Exception:
-                        exc_type, exc_value, exc_tb = sys.exc_info()
-                        traceback.print_exception(exc_type, exc_value, exc_tb)
-                        traceback.print_exception(exc_type, exc_value, exc_tb, file=self.fp)
-                        self.fp.flush()
+                        logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
+                        b.clear()
+                        db.close()
+                        return
                     break
-            except Exception:
+            except Exception as e:
                 pass
 
         b.write()
@@ -410,6 +421,8 @@ class StakePool():
                 with db.write_batch(transaction=True) as b:
                     self.processPoolRewardWithdrawal(height, db, b)
 
+        if height % 5000 == 0:
+            self.compact_db(db)
         db.close()
         self.poolHeight = height
 
@@ -526,38 +539,10 @@ class StakePool():
                             format8(poolRewardTotal),
                             format8(poolCoinTotal)))
 
-    def processPayments(self, height, db, b):
-        logmt(self.fp, 'processPayments height: %d\n' % (height))
-
-        b.put(bytes([DBT_DATA]) + b'last_payment_run', struct.pack('>i', height))
-
+    def makePayments(self, db, b, outputs, height):
+        logmt(self.fp, 'makePayments')
         totalDisbursed = 0
         txns = []
-        outputs = []
-        for key, value in db.iterator(prefix=bytes([DBT_BAL])):
-            addrAccumulated = int.from_bytes(value[:16], 'big')
-
-            if (addrAccumulated // COIN) < self.payoutThreshold:
-                continue
-
-            addrPending = int.from_bytes(value[16:24], 'big')
-            addrPaidout = int.from_bytes(value[24:32], 'big')
-            address = encodeAddress(key[1:])
-
-            payout = addrAccumulated // COIN
-            totalDisbursed += payout
-            addrAccumulated -= payout * COIN
-
-            outputs.append({'address': address, 'amount': format8(payout)})
-            addrPending += payout
-
-            b.put(key, addrAccumulated.to_bytes(16, 'big') + addrPending.to_bytes(8, 'big') + addrPaidout.to_bytes(8, 'big') + value[32:])
-
-        if len(outputs) < 1:
-            return
-
-        if self.mode != 'master':
-            return
 
         # Safety check to prevent double paying if resyncing the chain in master mode
         ro = self.rpc_func('getblockchaininfo')
@@ -572,6 +557,7 @@ class StakePool():
             totalDisbursedInTx = 0
             for o in sl:
                 totalDisbursedInTx += int(decimal.Decimal(o['amount']) * COIN)
+            totalDisbursed += totalDisbursedInTx
             # Send change back to the pool reward address for easier tracking by observers
             opts = {
                 'show_fee': True,
@@ -598,7 +584,7 @@ class StakePool():
                                     '',
                                     '',
                                     '',
-                                    format16(addrAccumulated),
+                                    '',
                                     o['amount'],
                                     ro['txid'],
                                     ))
@@ -621,6 +607,66 @@ class StakePool():
                             format8(totalPoolFees),
                             '|'.join(txns)
                             ))
+
+    def processPayments(self, height, db, b):
+        logmt(self.fp, 'processPayments height: %d\n' % (height))
+
+        b.put(bytes([DBT_DATA]) + b'last_payment_run', struct.pack('>i', height))
+
+        outputs = []
+        for key, value in db.iterator(prefix=bytes([DBT_BAL])):
+            addrAccumulated = int.from_bytes(value[:16], 'big')
+
+            if (addrAccumulated // COIN) < self.payoutThreshold:
+                continue
+
+            addrPending = int.from_bytes(value[16:24], 'big')
+            addrPaidout = int.from_bytes(value[24:32], 'big')
+            address = encodeAddress(key[1:])
+
+            payout = addrAccumulated // COIN
+            addrAccumulated -= payout * COIN
+
+            outputs.append({'address': address, 'amount': format8(payout)})
+            addrPending += payout
+
+            b.put(key, addrAccumulated.to_bytes(16, 'big') + addrPending.to_bytes(8, 'big') + addrPaidout.to_bytes(8, 'big') + value[32:])
+
+        if len(outputs) < 1:
+            return
+
+        if self.mode != 'master' or not self.automatic_disbursement:
+            return
+
+        self.makePayments(db, b, outputs, height)
+
+    @getDBMutex
+    def getPending(self, send_txns=False):
+        logmt(self.fp, 'getPending')
+        try:
+            db = plyvel.DB(self.dbPath, create_if_missing=True)
+
+            outputs = []
+            for key, value in db.iterator(prefix=bytes([DBT_BAL])):
+                amount_pending = int.from_bytes(value[16:24], 'big')
+
+                if amount_pending < self.payoutThreshold:
+                    continue
+
+                address = encodeAddress(key[1:])
+                outputs.append({'address': address, 'amount': format8(amount_pending)})
+
+            if not send_txns:
+                return outputs
+            if self.automatic_disbursement:
+                raise ValueError('automatic_disbursement is enabled.')
+            b = db.write_batch(transaction=True)
+            self.makePayments(db, b, outputs, -1)
+            b.write()
+
+        finally:
+            db.close()
+        return outputs
 
     def findPayments(self, height, coinstakeid, db, b, batchBalances):
         # logm(self.fp, 'findPayments')
@@ -757,10 +803,7 @@ class StakePool():
                 total_pool_fees = fee if n is None else fee + int.from_bytes(n, 'big')
                 self.setBatched(dbkey, total_pool_fees.to_bytes(8, 'big'), b, batchBalances)
             except Exception:
-                exc_type, exc_value, exc_tb = sys.exc_info()
-                traceback.print_exception(exc_type, exc_value, exc_tb)
-                traceback.print_exception(exc_type, exc_value, exc_tb, file=self.fp)
-                self.fp.flush()
+                logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
 
     def processPoolRewardWithdrawal(self, height, db, b):
         logmt(self.fp, 'processPoolRewardWithdrawal height: %d\n' % (height))
@@ -844,10 +887,7 @@ class StakePool():
                 logm(self.fp, 'Available balance after withdrawal %f' % (r['balance']))
 
         except Exception:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
-            traceback.print_exception(exc_type, exc_value, exc_tb, file=self.fp)
-            self.fp.flush()
+            logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
 
     def checkBlocks(self, limit_blocks=-1):
         try:
@@ -866,10 +906,7 @@ class StakePool():
         except zmq.Again as e:
             pass
         except Exception:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
-            traceback.print_exception(exc_type, exc_value, exc_tb, file=self.fp)
-            self.fp.flush()
+            logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
 
     @getDBMutex
     def getAddressSummary(self, address_str):
