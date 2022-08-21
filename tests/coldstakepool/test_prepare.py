@@ -73,7 +73,7 @@ class Test(unittest.TestCase):
 
         with open(os.path.expanduser('~/csp_testnet_obs/stakepool/stakepool.json')) as fp:
             settings = json.load(fp)
-            assert(settings['mode'] == 'observer')
+            assert (settings['mode'] == 'observer')
 
     def test_prepare_regtest(self):
         testargs = ['coldstakepool-prepare', '--datadir=~/csp_regtest', '--regtest']

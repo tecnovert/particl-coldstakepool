@@ -242,12 +242,12 @@ class Test(unittest.TestCase):
         self.processes[-1].start()
 
         callnoderpc(0, 'extkeyimportmaster', ['abandon baby cabbage dad eager fabric gadget habit ice kangaroo lab absorb'])
-        assert(callnoderpc(0, 'getwalletinfo')['total_balance'] == 100000)
+        assert (callnoderpc(0, 'getwalletinfo')['total_balance'] == 100000)
 
         callnoderpc(1, 'extkeyimportmaster', ['pact mammal barrel matrix local final lecture chunk wasp survey bid various book strong spread fall ozone daring like topple door fatigue limb olympic', '', 'true'])
         callnoderpc(1, 'getnewextaddress', ['lblExtTest'])
         callnoderpc(1, 'rescanblockchain')
-        assert(callnoderpc(1, 'getwalletinfo')['total_balance'] == 25000)
+        assert (callnoderpc(1, 'getwalletinfo')['total_balance'] == 25000)
 
         # Wait for pool daemon to start
         authcookiepath = os.path.join(TEST_DIR, 'csp_regtest', 'regtest', '.cookie')
@@ -273,7 +273,7 @@ class Test(unittest.TestCase):
         staking_options['enabled'] = False
         staking_options = callrpc(pool_rpc_port, pool_rpc_auth, 'walletsettings', ['stakingoptions', staking_options], wallet='pool_stake')
         staking_options = callrpc(pool_rpc_port, pool_rpc_auth, 'walletsettings', ['stakingoptions'], wallet='pool_stake')['stakingoptions']
-        assert(staking_options['stakecombinethreshold'] == 100)
+        assert (staking_options['stakecombinethreshold'] == 100)
 
         for i in range(5):
             try:
@@ -399,7 +399,7 @@ class Test(unittest.TestCase):
             if r['blocks'] > 0:
                 break
             time.sleep(1)
-        assert(r['blocks'] > 0)
+        assert (r['blocks'] > 0)
 
         # Send coin from node1 to pool
         txid = callnoderpc(1, 'sendtypeto', ['part', 'part', outputs_node1], wallet='')
@@ -465,7 +465,7 @@ class Test(unittest.TestCase):
         total_pool_users = total_pool_users
         total_pool = total_pool_users + pool_end['poolrewardtotal']
         logging.info('total_pool_users + pool_reward: %d', total_pool)
-        assert(abs(accum_block_rewards - total_pool) < 10)
+        assert (abs(accum_block_rewards - total_pool) < 10)
 
         changeaddress = {'coldstakingaddress': addr_pool_stake, 'address_standard': ms_addr['address']}
         callnoderpc(0, 'walletsettings', ['changeaddress', changeaddress], wallet='MS Wallet')
@@ -480,10 +480,10 @@ class Test(unittest.TestCase):
 
         tx = callnoderpc(0, 'decoderawtransaction', [stx2['hex']], wallet='MS Wallet')
         change_n = 1 if tx['vout'][0]['scriptPubKey']['addresses'][0] == addr_out else 0
-        assert(tx['vout'][change_n]['scriptPubKey']['addresses'][0] == ms_addr['address'])
+        assert (tx['vout'][change_n]['scriptPubKey']['addresses'][0] == ms_addr['address'])
 
         addr_pool_stake_plain = callnoderpc(0, 'validateaddress', [addr_pool_stake, True])['base58_address']
-        assert(tx['vout'][change_n]['scriptPubKey']['stakeaddresses'][0] == addr_pool_stake_plain)
+        assert (tx['vout'][change_n]['scriptPubKey']['stakeaddresses'][0] == addr_pool_stake_plain)
 
         txid = callnoderpc(0, 'sendrawtransaction', [stx2['hex']])
         logging.info('Spent from ms addr in tx: %s', txid)

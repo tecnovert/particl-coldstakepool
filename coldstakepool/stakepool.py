@@ -138,7 +138,8 @@ class StakePool():
         if self.mode == 'master':
             try:
                 self.min_blocks_between_withdrawals = self.settings['poolownerwithdrawal']['frequency']
-                assert(self.min_blocks_between_withdrawals > self.blockBuffer), 'Bad frequency'
+                if self.min_blocks_between_withdrawals <= self.blockBuffer:
+                    raise ValueError('Bad frequency')
                 numset = 0
                 if 'address' in self.settings['poolownerwithdrawal']:
                     address = self.settings['poolownerwithdrawal']['address']
@@ -149,8 +150,10 @@ class StakePool():
                     numset += 1
                 if numset != 1:
                     raise ValueError('"address" or "destinations" must be set')
-                assert(self.settings['poolownerwithdrawal']['reserve'] >= 0.0005), 'Low reserve'
-                assert(self.settings['poolownerwithdrawal']['threshold'] >= 0.0), 'Low threshold'
+                if self.settings['poolownerwithdrawal']['reserve'] < 0.0005:
+                    raise ValueError('Low reserve')
+                if self.settings['poolownerwithdrawal']['threshold'] < 0.0:
+                    raise ValueError('Low threshold')
                 self.have_withdrawal_info = True
             except Exception as e:
                 traceback.print_exc()
@@ -307,10 +310,10 @@ class StakePool():
             try:
                 dests = []
                 for address, weight in self.owner_withdrawal_dests.items():
-                    assert(isinstance(weight, int))
-                    assert(weight > -1)
+                    assert (isinstance(weight, int))
+                    assert (weight > -1)
                     r = self.rpc_func('validateaddress', [address])
-                    assert(r['isvalid'] is True)
+                    assert (r['isvalid'] is True)
                     if address in dests:
                         raise ValueError('Pool reward withdrawal destinations must be unique.')
                     dests.append(address)

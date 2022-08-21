@@ -207,7 +207,7 @@ def extractParticlCore():
     output = subprocess.check_output([daemon_path, '--version'])
     version = output.splitlines()[0].decode('utf-8')
     print('particld --version\n' + version)
-    assert(PARTICL_VERSION in version)
+    assert (PARTICL_VERSION in version)
 
 
 def printVersion():
@@ -414,8 +414,8 @@ def main():
             pool_reward_address = settings['rewardaddress']
 
             v = rpc_func('validateaddress', [pool_stake_address])
-            assert('isvalid' in v)
-            assert(v['isvalid'] is True)
+            assert ('isvalid' in v)
+            assert (v['isvalid'] is True)
 
             rpc_func('importaddress', [v['address']], wallet='pool_stake')
             rpc_func('importaddress', [pool_reward_address], wallet='pool_reward')
