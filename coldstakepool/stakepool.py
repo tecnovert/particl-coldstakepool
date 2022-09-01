@@ -112,7 +112,7 @@ class StakePool():
 
         self.dbPath = os.path.join(dataDir, 'stakepooldb')
 
-        db = plyvel.DB(self.dbPath, create_if_missing=True)
+        db = self.openDB(create_db=True)
         n = db.get(bytes([DBT_DATA]) + b'current_height')
         if n is None:
             logmt(self.fp, 'First run\n')
@@ -208,6 +208,17 @@ class StakePool():
         self.rpc_port = settings.get('rpcport', 51735 if self.chain == 'mainnet' else 51935)
 
         self.rpc_func = make_rpc_func(self.rpc_host, self.rpc_port, self.rpc_auth)
+
+    def log(self, message):
+        logmt(self.fp, message)
+
+    def openDB(self, create_db=False):
+        try:
+            return plyvel.DB(self.dbPath, create_if_missing=create_db)
+        except Exception as e:
+            if self.debug:
+                logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
+            raise ValueError('Failed to open DB')
 
     def start(self):
         logmt(self.fp, 'Starting StakePool at height %d\nPool Address: %s, Reward Address: %s, Mode %s\n' % (self.poolHeight, self.poolAddr, self.poolAddrReward, self.mode))
@@ -341,7 +352,7 @@ class StakePool():
         rv = self.rebuildMetrics()
         logmt(self.fp, 'rebuildMetrics processed %d blocks and %d payments.' % (rv['processedblocks'], rv['processedpayments']))
 
-        db = plyvel.DB(self.dbPath, create_if_missing=True)
+        db = self.openDB(create_db=True)
         db.put(bytes([DBT_DATA]) + b'db_version', struct.pack('>i', CURRENT_DB_VERSION))
         db.close()
 
@@ -367,7 +378,7 @@ class StakePool():
 
         reward = self.rpc_func('getblockreward', [height, ])
 
-        db = plyvel.DB(self.dbPath, create_if_missing=True)
+        db = self.openDB(create_db=True)
 
         n = db.get(bytes([DBT_DATA]) + b'current_height')
         if n is not None:
@@ -647,7 +658,7 @@ class StakePool():
     def getPending(self, send_txns=False):
         logmt(self.fp, 'getPending')
         try:
-            db = plyvel.DB(self.dbPath, create_if_missing=True)
+            db = self.openDB(create_db=True)
 
             outputs = []
             for key, value in db.iterator(prefix=bytes([DBT_BAL])):
@@ -921,7 +932,7 @@ class StakePool():
            or len(address) != 33 and not is_script_prefix(address[0]):
             raise ValueError('Invalid address')
 
-        db = plyvel.DB(self.dbPath)
+        db = self.openDB()
 
         dbkey = bytes([DBT_BAL]) + address
         n = db.get(dbkey)
@@ -948,7 +959,7 @@ class StakePool():
     def rebuildMetrics(self):
 
         # Remove old metrics cache records
-        db = plyvel.DB(self.dbPath)
+        db = self.openDB()
         it = db.iterator(prefix=bytes([DBT_POOL_METRICS]))
         try:
             while True:
@@ -1010,7 +1021,7 @@ class StakePool():
 
     @getDBMutex
     def getMetrics(self):
-        db = plyvel.DB(self.dbPath)
+        db = self.openDB()
         month_metrics = []
         it = db.iterator(prefix=bytes([DBT_POOL_METRICS]), reverse=True)
         try:
@@ -1031,7 +1042,7 @@ class StakePool():
 
         rv['poolmode'] = self.mode
 
-        db = plyvel.DB(self.dbPath)
+        db = self.openDB()
 
         n = db.get(bytes([DBT_DATA]) + b'current_height')
         rv['poolheight'] = 0 if n is None else struct.unpack('>i', n)[0]

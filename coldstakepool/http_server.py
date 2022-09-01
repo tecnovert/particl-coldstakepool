@@ -69,7 +69,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         settings_path = os.path.join(self.server.stakePool.dataDir, 'stakepool.json')
 
         if not os.path.exists(settings_path):
-            return self.page_error('Settings file not found.')
+            raise ValueError('Settings file not found.')
 
         with open(settings_path) as fs:
             settings = json.load(fs)
@@ -86,14 +86,11 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_address(self, urlSplit):
         if len(urlSplit) < 3:
-            return self.page_error('Must specify address')
+            raise ValueError('Must specify address')
 
         address_str = urlSplit[2]
         stakePool = self.server.stakePool
-        try:
-            summary = stakePool.getAddressSummary(address_str)
-        except Exception as e:
-            return self.page_error(str(e))
+        summary = stakePool.getAddressSummary(address_str)
 
         content = '<!DOCTYPE html><html lang="en">\n<head>' \
             + '<meta charset="UTF-8">' \
@@ -119,10 +116,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         return bytes(content, 'UTF-8')
 
     def page_voting_info(self, urlSplit):
-        try:
-            voting_settings = self.server.stakePool.getVotingInfo()
-        except Exception as e:
-            return self.page_error(str(e))
+        voting_settings = self.server.stakePool.getVotingInfo()
 
         vote_settings_content = ''
         for r in voting_settings:
@@ -143,10 +137,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         return bytes(content, 'UTF-8')
 
     def page_version(self):
-        try:
-            versions = self.server.stakePool.getVersions()
-        except Exception as e:
-            return self.page_error(str(e))
+        versions = self.server.stakePool.getVersions()
 
         content = '<!DOCTYPE html><html lang="en">\n<head>' \
             + '<meta charset="UTF-8">' \
@@ -162,11 +153,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_index(self):
         stakePool = self.server.stakePool
-
-        try:
-            summary = stakePool.getSummary()
-        except Exception as e:
-            return self.page_error(str(e))
+        summary = stakePool.getSummary()
 
         content = '<!DOCTYPE html><html lang="en">\n<head>' \
             + '<meta charset="UTF-8">' \
@@ -239,13 +226,15 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def handle_http(self, status_code, path):
         urlSplit = self.path.split('/')
-        if len(urlSplit) > 1:
-            if urlSplit[1] == 'config':
-                self.putHeaders(status_code, 'text/plain')
-                return self.page_config(urlSplit)
-            if urlSplit[1] == 'json':
-                self.putHeaders(status_code, 'text/plain')
-                try:
+        is_json = False
+        try:
+            if len(urlSplit) > 1:
+                if urlSplit[1] == 'config':
+                    self.putHeaders(status_code, 'text/plain')
+                    return self.page_config(urlSplit)
+                if urlSplit[1] == 'json':
+                    is_json = True
+                    self.putHeaders(status_code, 'text/plain')
                     if len(urlSplit) > 2:
                         if urlSplit[2] == 'address':
                             return self.js_address(urlSplit)
@@ -258,18 +247,23 @@ class HttpHandler(BaseHTTPRequestHandler):
                         if urlSplit[2] == 'pending':
                             return self.js_pending(urlSplit)
                     return self.js_index(urlSplit)
-                except Exception as e:
-                    return self.js_error(str(e))
-            self.putHeaders(status_code, 'text/html')
-            if urlSplit[1] == 'address':
-                return self.page_address(urlSplit)
-            if urlSplit[1] == 'version':
-                return self.page_version()
-            if urlSplit[1] == 'voting':
-                return self.page_voting_info(urlSplit)
-        else:
-            self.putHeaders(status_code, 'text/html')
-        return self.page_index()
+                self.putHeaders(status_code, 'text/html')
+                if urlSplit[1] == 'address':
+                    return self.page_address(urlSplit)
+                if urlSplit[1] == 'version':
+                    return self.page_version()
+                if urlSplit[1] == 'voting':
+                    return self.page_voting_info(urlSplit)
+            else:
+                self.putHeaders(status_code, 'text/html')
+            return self.page_index()
+        except IOError as e:
+            stake_pool = self.server.stakePool
+            if stake_pool.debug:
+                stake_pool.log(str(e))
+            return self.js_error('IO Error') if is_json else self.page_error('IO Error')
+        except Exception as e:
+            return self.js_error(str(e)) if is_json else self.page_error(str(e))
 
     def do_GET(self):
         response = self.handle_http(200, self.path)
