@@ -72,6 +72,11 @@ then switchover to master. If reloading in master mode the script will
 attempt to make payments that have already been paid.
 
 
+## Guix:
+
+    guix shell --pure -L. openssl -D particl-coldstakepool
+
+
 ## Further Work:
 
 - Track extaddress stake address
