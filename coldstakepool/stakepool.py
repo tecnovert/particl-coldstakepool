@@ -721,7 +721,7 @@ class StakePool():
                 diff = addrPending - existing_payments
                 total_reset += diff
                 logmt(self.fp, f'WARNING: {address} expected pending {addrPending} > actual pending amount in txns {existing_payments}')
-                if self.settings.get('recalc_pending', False):
+                if self.mode == 'master' and self.settings.get('recalc_pending', False):
                     addrPending -= diff
                     addrAccumulated += diff * COIN
                     b.put(key, addrAccumulated.to_bytes(16, 'big') + addrPending.to_bytes(8, 'big') + addrPaidout.to_bytes(8, 'big') + value[32:])
