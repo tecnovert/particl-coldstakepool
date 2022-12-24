@@ -231,6 +231,10 @@ class StakePool():
 
         if self.mode == 'master':
             self.runSanityChecks()
+
+        db = self.openDB(create_db=True)
+        self.listAccumulated(self.poolHeight, db)
+        db.close()
         self.daemon_running = True
 
     def stopRunning(self, with_code=0):
@@ -655,6 +659,85 @@ class StakePool():
         self.makePayments(db, b, outputs, height)
 
     @getDBMutex
+    def listAccumulated(self, height, db):
+        logmt(self.fp, 'listAccumulated height: %d' % (height))
+
+        b = db.write_batch(transaction=True)
+
+        total_actual_pending = 0
+        pending_payments = {}
+        for k, value in db.iterator(prefix=bytes([DBT_POOL_PENDING_PAYOUT])):
+            payment_txid = k[1:].hex()
+            logmt(self.fp, f'Found pending pool payment tx: {payment_txid}')
+            tx = self.rpc_func('getrawtransaction', [payment_txid, True])
+
+            for out in tx['vout']:
+                try:
+                    if out['type'] == 'data':
+                        continue
+                    if out['type'] == 'blind':
+                        logmt(self.fp, 'WARNING: Found txn %s paying to blinded output.' % (payment_txid))
+                        have_blinded = True
+                        continue
+                    if out['type'] == 'anon':
+                        logmt(self.fp, 'WARNING: Found txn %s paying to anon output.' % (payment_txid))
+                        have_blinded = True
+                        continue
+                except Exception:
+                    logmt(self.fp, 'WARNING: Found txn %s paying to unknown output type.' % (payment_txid))
+                    continue
+
+                address = None
+                try:
+                    spk = out['scriptPubKey']
+                    address = spk['addresses'][0] if 'addresses' in spk else spk['address']
+                except Exception:
+                    logmt(self.fp, 'WARNING: Found txn %s paying to unknown address.' % (payment_txid))
+                    continue
+
+                if address == self.poolAddrReward:
+                    # Change output
+                    continue
+                v = int(decimal.Decimal(out['value']) * COIN)
+                pending_payments[address] = pending_payments.get(address, 0) + v
+                total_actual_pending += v
+
+        num_addrs: int = 0
+        total_addrAccumulated: int = 0
+        total_addrPending: int = 0
+        total_reset: int = 0
+        for key, value in db.iterator(prefix=bytes([DBT_BAL])):
+            address = encodeAddress(key[1:])
+            addrAccumulated = int.from_bytes(value[:16], 'big')
+            addrPending = int.from_bytes(value[16:24], 'big')
+            addrPaidout = int.from_bytes(value[24:32], 'big')
+
+            num_addrs += 1
+            total_addrAccumulated += addrAccumulated
+            total_addrPending += addrPending
+
+            existing_payments = pending_payments.get(address, 0)
+            if addrPending > existing_payments:
+                diff = addrPending - existing_payments
+                total_reset += diff
+                logmt(self.fp, f'WARNING: {address} expected pending {addrPending} > actual pending amount in txns {existing_payments}')
+                if self.settings.get('recalc_pending', False):
+                    addrPending -= diff
+                    addrAccumulated += diff * COIN
+                    b.put(key, addrAccumulated.to_bytes(16, 'big') + addrPending.to_bytes(8, 'big') + addrPaidout.to_bytes(8, 'big') + value[32:])
+
+        logmt(self.fp, 'num_addrs: %d' % (num_addrs))
+        logmt(self.fp, 'total accumulated: %d' % (total_addrAccumulated // COIN))
+        logmt(self.fp, 'total expected payout pending: %d' % (total_addrPending))
+        logmt(self.fp, 'total actual payout pending: %d' % (total_actual_pending))
+
+        if self.settings.get('recalc_pending', False):
+            b.write()
+            logmt(self.fp, f'total pending payout reset: {total_reset}')
+        else:
+            logmt(self.fp, f'total difference between expected and actual pending payout: {total_reset}')
+
+    @getDBMutex
     def getPending(self, send_txns=False):
         logmt(self.fp, 'getPending')
         try:
@@ -741,7 +824,8 @@ class StakePool():
 
                 address = None
                 try:
-                    address = out['scriptPubKey']['addresses'][0]
+                    spk = out['scriptPubKey']
+                    address = spk['addresses'][0] if 'addresses' in spk else spk['address']
                 except Exception:
                     logmt(self.fp, 'WARNING: Found txn %s paying to unknown address.\n' % (txid))
                     continue
