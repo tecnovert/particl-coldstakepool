@@ -28,7 +28,6 @@ from .util import (
     decodeAddress,
     encodeAddress,
     make_rpc_func,
-    WRITE_TO_LOG_FILE,
 )
 
 from .chainparams import is_script_prefix
@@ -90,7 +89,6 @@ class StakePool():
         self.particlDataDir = os.path.expanduser(settings['particldatadir'])
         self.chain = chain
         self.debug = settings.get('debug', DEBUG)
-        WRITE_TO_LOG_FILE = settings.get('writelogfile', True)
 
         self.poolAddrHrp = 'pcs' if self.chain == 'mainnet' else 'tpcs'
 

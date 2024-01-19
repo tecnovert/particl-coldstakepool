@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2021 The Particl Core developers
+# Copyright (c) 2018-2024 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -22,6 +22,7 @@ from coldstakepool.http_server import HttpThread
 from coldstakepool.util import (
     logmt,
     callrpc,
+    LOG_TIME,
 )
 
 ALLOW_CORS = True
@@ -34,7 +35,7 @@ def signal_handler(sig, frame):
         stakePool.stopRunning()
 
 
-def runStakePool(fp, dataDir, chain):
+def runStakePool(dataDir, chain):
     global stakePool
     settings_path = os.path.join(dataDir, 'stakepool.json')
 
@@ -44,34 +45,45 @@ def runStakePool(fp, dataDir, chain):
     with open(settings_path) as fs:
         settings = json.load(fs)
 
-    stakePool = StakePool(fp, dataDir, settings, chain)
-    stakePool.start()
-
-    threads = []
-    if 'htmlhost' in settings:
-        logmt(fp, 'Starting server at %s:%d.' % (settings['htmlhost'], settings['htmlport']))
-        allow_cors = settings.get('allowcors', ALLOW_CORS)
-        key_salt = settings.get('management_key_salt', None)
-        key_hash = settings.get('management_key_hash', None)
-        tS1 = HttpThread(fp, settings['htmlhost'], settings['htmlport'], allow_cors, stakePool, key_salt, key_hash)
-        threads.append(tS1)
-        tS1.start()
-
+    fp = None
     try:
-        r = callrpc(stakePool.rpc_port, stakePool.rpc_auth, 'getblockchaininfo')
-        while r['blocks'] - stakePool.blockBuffer > stakePool.poolHeight and stakePool.is_running:
-            stakePool.processBlock(stakePool.poolHeight + 1)
-    except Exception as ex:
-        traceback.print_exc()
+        if settings.get('writelogfile', True):
+            fp = open(os.path.join(dataDir, 'stakepool.log'), 'w')
 
-    while stakePool.is_running:
-        time.sleep(0.5)
-        stakePool.checkBlocks()
+        LOG_TIME = settings.get('logtime', True)
+        logmt(fp, os.path.basename(sys.argv[0]) + ', version: ' + __version__ + '\n\n')
 
-    logmt(fp, 'Stopping threads.')
-    for t in threads:
-        t.stop()
-        t.join()
+        stakePool = StakePool(fp, dataDir, settings, chain)
+        stakePool.start()
+
+        threads = []
+        if 'htmlhost' in settings:
+            logmt(fp, 'Starting server at %s:%d.' % (settings['htmlhost'], settings['htmlport']))
+            allow_cors = settings.get('allowcors', ALLOW_CORS)
+            key_salt = settings.get('management_key_salt', None)
+            key_hash = settings.get('management_key_hash', None)
+            tS1 = HttpThread(fp, settings['htmlhost'], settings['htmlport'], allow_cors, stakePool, key_salt, key_hash)
+            threads.append(tS1)
+            tS1.start()
+
+        try:
+            r = callrpc(stakePool.rpc_port, stakePool.rpc_auth, 'getblockchaininfo')
+            while r['blocks'] - stakePool.blockBuffer > stakePool.poolHeight and stakePool.is_running:
+                stakePool.processBlock(stakePool.poolHeight + 1)
+        except Exception as ex:
+            traceback.print_exc()
+
+        while stakePool.is_running:
+            time.sleep(0.5)
+            stakePool.checkBlocks()
+
+        logmt(fp, 'Stopping threads.')
+        for t in threads:
+            t.stop()
+            t.join()
+    finally:
+        if fp:
+            fp.close()
 
 
 def printVersion():
@@ -132,9 +144,7 @@ def main():
     if not os.path.exists(dataDir):
         os.makedirs(dataDir)
 
-    with open(os.path.join(dataDir, 'stakepool.log'), 'w') as fp:
-        logmt(fp, os.path.basename(sys.argv[0]) + ', version: ' + __version__ + '\n\n')
-        runStakePool(fp, dataDir, chain)
+    runStakePool(dataDir, chain)
 
     print('Done.')
     return stakePool.fail_code if stakePool is not None else 0

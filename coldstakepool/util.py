@@ -26,27 +26,28 @@ except ImportError:
         import json
 
 
-WRITE_TO_LOG_FILE = True
+PRINT_TO_STD = True
+LOG_TIME = True
 COIN = 100000000
 DCOIN = decimal.Decimal(COIN)
 mxLog = threading.Lock()
 
 
-def logm(fp, s, tag='', printstd=True, writetofile=WRITE_TO_LOG_FILE):
+def logm(fp, s, tag='', printstd=PRINT_TO_STD):
     mxLog.acquire()
     try:
         if printstd:
             print(s)
 
-        if writetofile:
+        if fp is not None:
             fp.write(tag + s + '\n')
             fp.flush()
     finally:
         mxLog.release()
 
 
-def logmt(fp, s, printstd=True, writetofile=WRITE_TO_LOG_FILE):
-    logm(fp, time.strftime('%y-%m-%d_%H-%M-%S', time.localtime()) + '\t' + s, printstd=printstd, writetofile=writetofile)
+def logmt(fp, s, printstd=PRINT_TO_STD, log_time=LOG_TIME):
+    logm(fp, (time.strftime('%y-%m-%d_%H-%M-%S', time.localtime()) + '\t' + s) if log_time else s, printstd=printstd)
 
 
 def makeInt(v):
