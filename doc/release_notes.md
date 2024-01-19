@@ -1,5 +1,11 @@
 # Stakepool Release Notes
 
+## 0.24.0
+
+- New setting 'writelogfile'
+- Flush stdout periodically for journalctl
+
+
 ## 0.21.0
 
 - Compact leveldb every 5000 blocks

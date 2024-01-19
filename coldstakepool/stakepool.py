@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018-2022 The Particl Core developers
+# Copyright (c) 2018-2024 The Particl Core developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
+import sys
 import zmq
 import time
 import plyvel
@@ -27,6 +28,7 @@ from .util import (
     decodeAddress,
     encodeAddress,
     make_rpc_func,
+    WRITE_TO_LOG_FILE,
 )
 
 from .chainparams import is_script_prefix
@@ -88,6 +90,7 @@ class StakePool():
         self.particlDataDir = os.path.expanduser(settings['particldatadir'])
         self.chain = chain
         self.debug = settings.get('debug', DEBUG)
+        WRITE_TO_LOG_FILE = settings.get('writelogfile', True)
 
         self.poolAddrHrp = 'pcs' if self.chain == 'mainnet' else 'tpcs'
 
@@ -159,6 +162,7 @@ class StakePool():
                 traceback.print_exc()
                 self.have_withdrawal_info = False
                 logmt(self.fp, 'Error setting pool withdrawal info: ' + str(e))
+                sys.stdout.flush()
 
             # If pool was synced in observer mode 'pool_fees_detected' may be higher than 'pool_fees'
             # 'pool_fees_detected' is tracked at chain tip - buffer, while 'pool_fees' is tracked as the pool makes transactions
@@ -218,6 +222,7 @@ class StakePool():
         except Exception as e:
             if self.debug:
                 logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
+                sys.stdout.flush()
             raise ValueError('Failed to open DB')
 
     def start(self):
@@ -379,6 +384,7 @@ class StakePool():
     @getDBMutex
     def processBlock(self, height):
         logmt(self.fp, 'processBlock height %d' % (height))
+        sys.stdout.flush()
 
         reward = self.rpc_func('getblockreward', [height, ])
 
@@ -417,6 +423,7 @@ class StakePool():
                         self.processPoolBlock(height, reward, db, b, batchBalances)
                     except Exception:
                         logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
+                        sys.stdout.flush()
                         b.clear()
                         db.close()
                         return
@@ -902,6 +909,7 @@ class StakePool():
                 self.setBatched(dbkey, total_pool_fees.to_bytes(8, 'big'), b, batchBalances)
             except Exception:
                 logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
+                sys.stdout.flush()
 
     def processPoolRewardWithdrawal(self, height, db, b):
         logmt(self.fp, 'processPoolRewardWithdrawal height: %d\n' % (height))
@@ -955,6 +963,7 @@ class StakePool():
 
             if total_weight < 1:
                 logm(self.fp, 'Error: Reward withdrawal destinations weight sum is zero.')
+                sys.stdout.flush()
                 return
 
             outputs = []
@@ -986,6 +995,7 @@ class StakePool():
 
         except Exception:
             logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
+            sys.stdout.flush()
 
     def checkBlocks(self, limit_blocks=-1):
         try:
@@ -1005,6 +1015,7 @@ class StakePool():
             pass
         except Exception:
             logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
+            sys.stdout.flush()
 
     @getDBMutex
     def getAddressSummary(self, address_str):
