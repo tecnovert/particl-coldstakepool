@@ -109,9 +109,9 @@ def callnoderpc(node_id, method, params=[], wallet=None):
 
 
 def make_int(v, precision=8, r=-1):  # r = 0, no rounding, fail, r > 0 round up, r < 0 floor
-    if type(v) == float:
+    if isinstance(v, float):
         v = str(v)
-    elif type(v) == int:
+    elif isinstance(v, int):
         return v * 10 ** precision
 
     ep = 10 ** precision
@@ -216,6 +216,7 @@ class Test(unittest.TestCase):
         with open(settings_path) as fs:
             pool_settings = json.load(fs)
         pool_settings['startheight'] = 0
+        pool_settings['logtime'] = False
         pool_settings['parameters'][0]['payoutthreshold'] = 0.005
         pool_settings['parameters'][0]['minblocksbetweenpayments'] = 10
         with open(settings_path, 'w') as fp:

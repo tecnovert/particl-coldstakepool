@@ -89,6 +89,7 @@ class StakePool():
         self.particlDataDir = os.path.expanduser(settings['particldatadir'])
         self.chain = chain
         self.debug = settings.get('debug', DEBUG)
+        self.log_time = settings.get('logtime', True)
 
         self.poolAddrHrp = 'pcs' if self.chain == 'mainnet' else 'tpcs'
 
@@ -116,7 +117,7 @@ class StakePool():
         db = self.openDB(create_db=True)
         n = db.get(bytes([DBT_DATA]) + b'current_height')
         if n is None:
-            logmt(self.fp, 'First run\n')
+            self.log('First run\n')
             db.put(bytes([DBT_DATA]) + b'db_version', struct.pack('>i', CURRENT_DB_VERSION))
         else:
             self.poolHeight = struct.unpack('>i', n)[0]
@@ -159,8 +160,7 @@ class StakePool():
             except Exception as e:
                 traceback.print_exc()
                 self.have_withdrawal_info = False
-                logmt(self.fp, 'Error setting pool withdrawal info: ' + str(e))
-                sys.stdout.flush()
+                self.log('Error setting pool withdrawal info: ' + str(e))
 
             # If pool was synced in observer mode 'pool_fees_detected' may be higher than 'pool_fees'
             # 'pool_fees_detected' is tracked at chain tip - buffer, while 'pool_fees' is tracked as the pool makes transactions
@@ -172,7 +172,7 @@ class StakePool():
             pool_fees = 0 if n is None else int.from_bytes(n, 'big')
 
             if pool_fees_detected > pool_fees:
-                logmt(self.fp, 'Replacing pool_fees with pool_fees_detected: %s, %s' % (format8(pool_fees), format8(pool_fees_detected)))
+                self.log('Replacing pool_fees with pool_fees_detected: %s, %s' % (format8(pool_fees), format8(pool_fees_detected)))
                 db.put(dbkey, pool_fees_detected.to_bytes(8, 'big'))
         else:
             self.have_withdrawal_info = False
@@ -212,25 +212,25 @@ class StakePool():
         self.rpc_func = make_rpc_func(self.rpc_host, self.rpc_port, self.rpc_auth)
 
     def log(self, message):
-        logmt(self.fp, message)
+        logmt(self.fp, message, log_time=self.log_time)
+        sys.stdout.flush()
 
     def openDB(self, create_db=False):
         try:
             return plyvel.DB(self.dbPath, create_if_missing=create_db)
         except Exception as e:
             if self.debug:
-                logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
-                sys.stdout.flush()
+                self.log('ERROR: %s\n' % (traceback.format_exc()))
             raise ValueError('Failed to open DB')
 
     def start(self):
-        logmt(self.fp, 'Starting StakePool at height %d\nPool Address: %s, Reward Address: %s, Mode %s\n' % (self.poolHeight, self.poolAddr, self.poolAddrReward, self.mode))
+        self.log('Starting StakePool at height %d\nPool Address: %s, Reward Address: %s, Mode %s\n' % (self.poolHeight, self.poolAddr, self.poolAddrReward, self.mode))
 
         self.upgradeDatabase(self.db_version)
         self.waitForDaemonRPC()
 
         self.core_version = self.rpc_func('getnetworkinfo')['version']
-        logmt(self.fp, 'Particl Core version %s\n' % (self.core_version))
+        self.log('Particl Core version %s\n' % (self.core_version))
 
         if self.mode == 'master':
             self.runSanityChecks()
@@ -256,7 +256,7 @@ class StakePool():
                 if p['height'] > height:
                     break
 
-                logmt(self.fp, 'Set parameters at height %d %s' % (height, dumpj(p)))
+                self.log('Set parameters at height %d %s' % (height, dumpj(p)))
 
                 if 'poolfeepercent' in p:
                     self.poolFeePercent = p['poolfeepercent']
@@ -286,9 +286,9 @@ class StakePool():
                 return
             except Exception as ex:
                 traceback.print_exc()
-                logmt(self.fp, 'Can\'t connect to daemon RPC, trying again in %d second/s.' % (1 + i))
+                self.log('Can\'t connect to daemon RPC, trying again in %d second/s.' % (1 + i))
                 time.sleep(1 + i)
-        logmt(self.fp, 'Can\'t connect to daemon RPC, exiting.')
+        self.log('Can\'t connect to daemon RPC, exiting.')
         self.stopRunning(1)  # Exit with error so systemd will try restart stakepool
 
     def runSanityChecks(self):
@@ -299,10 +299,10 @@ class StakePool():
             if not isinstance(options, dict):
                 options = dict()
             if options.get('rewardaddress', None) != self.poolAddrReward:
-                logmt(self.fp, 'Warning: Incorrect reward address, updating to {}'.format(self.poolAddrReward))
+                self.log('Warning: Incorrect reward address, updating to {}'.format(self.poolAddrReward))
                 reset_stakingoptions = True
             if options.get('smsgfeeratetarget', None) != self.smsg_fee_rate_target:
-                logmt(self.fp, 'Warning: Incorrect smsg fee rate target, updating to {}'.format(self.smsg_fee_rate_target))
+                self.log('Warning: Incorrect smsg fee rate target, updating to {}'.format(self.smsg_fee_rate_target))
                 reset_stakingoptions = True
 
             if reset_stakingoptions:
@@ -314,15 +314,15 @@ class StakePool():
                 self.rpc_func('walletsettings', ['stakingoptions', options], 'pool_stake')
 
         except Exception:
-            logmt(self.fp, 'Warning: \'pool_stake\' wallet reward address isn\'t set!')
+            self.log('Warning: \'pool_stake\' wallet reward address isn\'t set!')
 
         try:
             r = self.rpc_func('walletsettings', ['stakingoptions'], 'pool_reward')
             if r['stakingoptions']['enabled'] is not False:
                 if r['stakingoptions']['enabled'].lower() != 'false':
-                    logmt(self.fp, 'Warning: Staking is not disabled on the \'pool_reward\' wallet!')
+                    self.log('Warning: Staking is not disabled on the \'pool_reward\' wallet!')
         except Exception:
-            logmt(self.fp, 'Warning: Staking is not disabled on the \'pool_reward\' wallet!')
+            self.log('Warning: Staking is not disabled on the \'pool_reward\' wallet!')
 
         if self.have_withdrawal_info:
             try:
@@ -337,27 +337,27 @@ class StakePool():
                     dests.append(address)
             except Exception as e:
                 self.have_withdrawal_info = False
-                logmt(self.fp, 'Warning: Invalid \'owner_withdrawal_dests\': ' + str(e))
+                self.log('Warning: Invalid \'owner_withdrawal_dests\': ' + str(e))
 
         if self.have_withdrawal_info:
-            logmt(self.fp, 'Withdraw pool rewards to destinations:')
+            self.log('Withdraw pool rewards to destinations:')
             for address, weight in self.owner_withdrawal_dests.items():
-                logmt(self.fp, '{}: {}'.format(address, weight))
-            logmt(self.fp, 'Min blocks between withdrawals: {}'.format(self.min_blocks_between_withdrawals))
+                self.log('{}: {}'.format(address, weight))
+            self.log('Min blocks between withdrawals: {}'.format(self.min_blocks_between_withdrawals))
         else:
-            logmt(self.fp, 'Withdraw pool rewards to address: Disabled.')
+            self.log('Withdraw pool rewards to address: Disabled.')
 
         if not self.automatic_disbursement:
-            logmt(self.fp, 'WARNING: Automatic disbursement is disabled.')
+            self.log('WARNING: Automatic disbursement is disabled.')
 
     def upgradeDatabase(self, db_version):
         if db_version >= CURRENT_DB_VERSION:
             return
 
-        logmt(self.fp, 'Upgrading Database from version %d to %d.' % (db_version, CURRENT_DB_VERSION))
+        self.log('Upgrading Database from version %d to %d.' % (db_version, CURRENT_DB_VERSION))
 
         rv = self.rebuildMetrics()
-        logmt(self.fp, 'rebuildMetrics processed %d blocks and %d payments.' % (rv['processedblocks'], rv['processedpayments']))
+        self.log('rebuildMetrics processed %d blocks and %d payments.' % (rv['processedblocks'], rv['processedpayments']))
 
         db = self.openDB(create_db=True)
         db.put(bytes([DBT_DATA]) + b'db_version', struct.pack('>i', CURRENT_DB_VERSION))
@@ -367,7 +367,7 @@ class StakePool():
         start = time.time()
         db.compact_range()
         end = time.time()
-        logmt(self.fp, 'Compacted db in {}s'.format(end - start))
+        self.log('Compacted db in {}s'.format(end - start))
 
     def getBatched(self, key, db, batch_mirror):
         n = batch_mirror.get(key)
@@ -381,8 +381,7 @@ class StakePool():
 
     @getDBMutex
     def processBlock(self, height):
-        logmt(self.fp, 'processBlock height %d' % (height))
-        sys.stdout.flush()
+        self.log('processBlock height %d' % (height))
 
         reward = self.rpc_func('getblockreward', [height, ])
 
@@ -392,7 +391,7 @@ class StakePool():
         if n is not None:
             poolDBHeight = struct.unpack('>i', n)[0]
             if poolDBHeight >= height:
-                logmt(self.fp, 'Block %d already processed, pooldb height %d' % (height, poolDBHeight))
+                self.log('Block %d already processed, pooldb height %d' % (height, poolDBHeight))
                 self.poolHeight = poolDBHeight
                 db.close()
                 return
@@ -416,12 +415,11 @@ class StakePool():
             try:
                 if self.poolAddrReward == out['script']['spendaddr']:
                     if out['value'] != reward['blockreward']:
-                        logmt(self.fp, 'WARNING: Pool reward mismatch at height %d\n' % (height))
+                        self.log('WARNING: Pool reward mismatch at height %d\n' % (height))
                     try:
                         self.processPoolBlock(height, reward, db, b, batchBalances)
                     except Exception:
-                        logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
-                        sys.stdout.flush()
+                        self.log('ERROR: %s\n' % (traceback.format_exc()))
                         b.clear()
                         db.close()
                         return
@@ -450,7 +448,7 @@ class StakePool():
         self.poolHeight = height
 
     def processPoolBlock(self, height, reward, db, b, batchBalances):
-        logmt(self.fp, 'Found block at ' + str(height))
+        self.log('Found block at ' + str(height))
         opts = {'mature_only': True, 'all_staked': True}
         outputs = self.rpc_func('listcoldstakeunspent', [self.poolAddr, height - 1, opts])
 
@@ -470,7 +468,7 @@ class StakePool():
             poolCoinTotal += v
 
         if lowValueOutputs > 0 and self.debug:
-            logmt(self.fp, 'Ignoring %d low value outputs at height %d' % (lowValueOutputs, height))
+            self.log('Ignoring %d low value outputs at height %d' % (lowValueOutputs, height))
 
         blockReward = int(decimal.Decimal(reward['blockreward']) * COIN)
 
@@ -540,7 +538,7 @@ class StakePool():
 
         if stakeBonus > 0:  # An output < minOutputValue may have staked
             if self.debug:
-                logmt(self.fp, 'Unassigned stake bonus: %s %s\n' % (reward['kernelscript']['spendaddr'], format8(stakeBonus)))
+                self.log('Unassigned stake bonus: %s %s\n' % (reward['kernelscript']['spendaddr'], format8(stakeBonus)))
 
         poolRewardTotal = int(poolReward + stakeBonus)
         dbkey = bytes([DBT_POOL_BAL]) + decodeAddress(self.poolAddrReward)
@@ -563,14 +561,14 @@ class StakePool():
                             format8(poolCoinTotal)))
 
     def makePayments(self, db, b, outputs, height):
-        logmt(self.fp, 'makePayments')
+        self.log('makePayments')
         totalDisbursed = 0
         txns = []
 
         # Safety check to prevent double paying if resyncing the chain in master mode
         ro = self.rpc_func('getblockchaininfo')
         if ro['blocks'] >= self.poolHeight + self.blockBuffer + 5:
-            logmt(self.fp, 'Warning: Pool height is below node height, skipping disbursement, %d, %d.\n' % (self.poolHeight, ro['blocks']))
+            self.log('Warning: Pool height is below node height, skipping disbursement, %d, %d.\n' % (self.poolHeight, ro['blocks']))
             return
 
         txfees = 0
@@ -632,7 +630,7 @@ class StakePool():
                             ))
 
     def processPayments(self, height, db, b):
-        logmt(self.fp, 'processPayments height: %d\n' % (height))
+        self.log('processPayments height: %d\n' % (height))
 
         b.put(bytes([DBT_DATA]) + b'last_payment_run', struct.pack('>i', height))
 
@@ -665,7 +663,7 @@ class StakePool():
 
     @getDBMutex
     def listAccumulated(self, height, db):
-        logmt(self.fp, 'listAccumulated height: %d' % (height))
+        self.log('listAccumulated height: %d' % (height))
 
         b = db.write_batch(transaction=True)
 
@@ -673,7 +671,7 @@ class StakePool():
         pending_payments = {}
         for k, value in db.iterator(prefix=bytes([DBT_POOL_PENDING_PAYOUT])):
             payment_txid = k[1:].hex()
-            logmt(self.fp, f'Found pending pool payment tx: {payment_txid}')
+            self.log(f'Found pending pool payment tx: {payment_txid}')
             tx = self.rpc_func('getrawtransaction', [payment_txid, True])
 
             for out in tx['vout']:
@@ -681,15 +679,15 @@ class StakePool():
                     if out['type'] == 'data':
                         continue
                     if out['type'] == 'blind':
-                        logmt(self.fp, 'WARNING: Found txn %s paying to blinded output.' % (payment_txid))
+                        self.log('WARNING: Found txn %s paying to blinded output.' % (payment_txid))
                         have_blinded = True
                         continue
                     if out['type'] == 'anon':
-                        logmt(self.fp, 'WARNING: Found txn %s paying to anon output.' % (payment_txid))
+                        self.log('WARNING: Found txn %s paying to anon output.' % (payment_txid))
                         have_blinded = True
                         continue
                 except Exception:
-                    logmt(self.fp, 'WARNING: Found txn %s paying to unknown output type.' % (payment_txid))
+                    self.log('WARNING: Found txn %s paying to unknown output type.' % (payment_txid))
                     continue
 
                 address = None
@@ -697,7 +695,7 @@ class StakePool():
                     spk = out['scriptPubKey']
                     address = spk['addresses'][0] if 'addresses' in spk else spk['address']
                 except Exception:
-                    logmt(self.fp, 'WARNING: Found txn %s paying to unknown address.' % (payment_txid))
+                    self.log('WARNING: Found txn %s paying to unknown address.' % (payment_txid))
                     continue
 
                 if address == self.poolAddrReward:
@@ -725,26 +723,26 @@ class StakePool():
             if addrPending > existing_payments:
                 diff = addrPending - existing_payments
                 total_reset += diff
-                logmt(self.fp, f'WARNING: {address} expected pending {addrPending} > actual pending amount in txns {existing_payments}')
+                self.log(f'WARNING: {address} expected pending {addrPending} > actual pending amount in txns {existing_payments}')
                 if self.mode == 'master' and self.settings.get('recalc_pending', False):
                     addrPending -= diff
                     addrAccumulated += diff * COIN
                     b.put(key, addrAccumulated.to_bytes(16, 'big') + addrPending.to_bytes(8, 'big') + addrPaidout.to_bytes(8, 'big') + value[32:])
 
-        logmt(self.fp, 'num_addrs: %d' % (num_addrs))
-        logmt(self.fp, 'total accumulated: %d' % (total_addrAccumulated // COIN))
-        logmt(self.fp, 'total expected payout pending: %d' % (total_addrPending))
-        logmt(self.fp, 'total actual payout pending: %d' % (total_actual_pending))
+        self.log('num_addrs: %d' % (num_addrs))
+        self.log('total accumulated: %d' % (total_addrAccumulated // COIN))
+        self.log('total expected payout pending: %d' % (total_addrPending))
+        self.log('total actual payout pending: %d' % (total_actual_pending))
 
         if self.settings.get('recalc_pending', False):
             b.write()
-            logmt(self.fp, f'total pending payout reset: {total_reset}')
+            self.log(f'total pending payout reset: {total_reset}')
         else:
-            logmt(self.fp, f'total difference between expected and actual pending payout: {total_reset}')
+            self.log(f'total difference between expected and actual pending payout: {total_reset}')
 
     @getDBMutex
     def getPending(self, send_txns=False):
-        logmt(self.fp, 'getPending')
+        self.log('getPending')
         try:
             db = self.openDB(create_db=True)
 
@@ -783,7 +781,7 @@ class StakePool():
         for delta in ro:
             if delta['txid'] == coinstakeid:
                 if delta['satoshis'] < 0:
-                    logmt(self.fp, 'WARNING: Pool reward coin spent in coinstake %s\n' % (coinstakeid))
+                    self.log('WARNING: Pool reward coin spent in coinstake %s\n' % (coinstakeid))
                 continue
             txids.add(delta['txid'])
 
@@ -805,7 +803,7 @@ class StakePool():
                     else:
                         total_input_value += int(decimal.Decimal(prevout['value']) * COIN)
                 except Exception:
-                    logmt(self.fp, 'WARNING: Could not get prevout value input %s.%d.\n' % (txid, n))
+                    self.log('WARNING: Could not get prevout value input %s.%d.\n' % (txid, n))
 
             totalDisbursed = 0
             for out in ro['vout']:
@@ -813,15 +811,15 @@ class StakePool():
                     if out['type'] == 'data':
                         continue
                     if out['type'] == 'blind':
-                        logmt(self.fp, 'WARNING: Found txn %s paying to blinded output.\n' % (txid))
+                        self.log('WARNING: Found txn %s paying to blinded output.\n' % (txid))
                         have_blinded = True
                         continue
                     if out['type'] == 'anon':
-                        logmt(self.fp, 'WARNING: Found txn %s paying to anon output.\n' % (txid))
+                        self.log('WARNING: Found txn %s paying to anon output.\n' % (txid))
                         have_blinded = True
                         continue
                 except Exception:
-                    logmt(self.fp, 'WARNING: Found txn %s paying to unknown output type.\n' % (txid))
+                    self.log('WARNING: Found txn %s paying to unknown output type.\n' % (txid))
                     continue
 
                 v = int(decimal.Decimal(out['value']) * COIN)
@@ -832,7 +830,7 @@ class StakePool():
                     spk = out['scriptPubKey']
                     address = spk['addresses'][0] if 'addresses' in spk else spk['address']
                 except Exception:
-                    logmt(self.fp, 'WARNING: Found txn %s paying to unknown address.\n' % (txid))
+                    self.log('WARNING: Found txn %s paying to unknown address.\n' % (txid))
                     continue
 
                 if address == self.poolAddrReward:
@@ -842,7 +840,7 @@ class StakePool():
                 dbkey = bytes([DBT_BAL]) + decodeAddress(address)
                 n = self.getBatched(dbkey, db, batchBalances)
                 if n is None:
-                    logmt(self.fp, 'Withdrawal detected from pool reward balance %s %d %s.\n' % (txid, out['n'], format8(v)))
+                    self.log('Withdrawal detected from pool reward balance %s %d %s.\n' % (txid, out['n'], format8(v)))
 
                     dbkey = bytes([DBT_DATA]) + b'pool_withdrawn'
                     n = self.getBatched(dbkey, db, batchBalances)
@@ -862,9 +860,9 @@ class StakePool():
                 addrPaidout += v
                 totalDisbursed += v
                 if addrPending < 0:
-                    logmt(self.fp, 'WARNING: txn %s overpays address %s more than pending payout, pending: %d, paid: %d.\n' % (txid, address, addrPending + v, v), True, True)
+                    self.log('WARNING: txn %s overpays address %s more than pending payout, pending: %d, paid: %d.\n' % (txid, address, addrPending + v, v), True, True)
                     if addrReward + (addrPending * COIN) < 0:
-                        logmt(self.fp, 'WARNING: txn %s overpays address %s more than accumulated reward %d, paid: %d.\n' % (txid, address, addrPending + v, v), True, True)
+                        self.log('WARNING: txn %s overpays address %s more than accumulated reward %d, paid: %d.\n' % (txid, address, addrPending + v, v), True, True)
                     else:
                         # Reduce accumulated reward by amount overpaid
                         addrReward += addrPending * COIN
@@ -873,7 +871,7 @@ class StakePool():
                 self.setBatched(dbkey, addrReward.to_bytes(16, 'big') + addrPending.to_bytes(8, 'big') + addrPaidout.to_bytes(8, 'big') + n[32:], b, batchBalances)
 
                 if self.debug:
-                    logmt(self.fp, 'Payout to %s: %s %d %s.' % (address, txid, out['n'], format8(v)))
+                    self.log('Payout to %s: %s %d %s.' % (address, txid, out['n'], format8(v)))
 
             if totalDisbursed > 0:
                 b.put(bytes([DBT_POOL_PAYOUT]) + struct.pack('>i', height) + bytes.fromhex(txid), totalDisbursed.to_bytes(8, 'big'))
@@ -899,18 +897,17 @@ class StakePool():
                     fee = total_input_value - total_output_value
 
                 if self.debug:
-                    logmt(self.fp, 'Payout tx %s, input %s, output %s, fee %s.\n' % (txid, format8(total_input_value), format8(total_output_value), format8(fee)))
+                    self.log('Payout tx %s, input %s, output %s, fee %s.\n' % (txid, format8(total_input_value), format8(total_output_value), format8(fee)))
 
                 dbkey = bytes([DBT_DATA]) + b'pool_fees_detected'
                 n = self.getBatched(dbkey, db, batchBalances)
                 total_pool_fees = fee if n is None else fee + int.from_bytes(n, 'big')
                 self.setBatched(dbkey, total_pool_fees.to_bytes(8, 'big'), b, batchBalances)
             except Exception:
-                logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
-                sys.stdout.flush()
+                self.log('ERROR: %s\n' % (traceback.format_exc()))
 
     def processPoolRewardWithdrawal(self, height, db, b):
-        logmt(self.fp, 'processPoolRewardWithdrawal height: %d\n' % (height))
+        self.log('processPoolRewardWithdrawal height: %d\n' % (height))
 
         b.put(bytes([DBT_DATA]) + b'last_withdrawal_run', struct.pack('>i', height))
 
@@ -938,7 +935,7 @@ class StakePool():
 
         ro = self.rpc_func('getblockchaininfo')
         if ro['blocks'] >= self.poolHeight + self.blockBuffer + 5:
-            logmt(self.fp, 'Warning: Pool height is below node height, skipping withdrawal, %d, %d.\n' % (self.poolHeight, ro['blocks']))
+            self.log('Warning: Pool height is below node height, skipping withdrawal, %d, %d.\n' % (self.poolHeight, ro['blocks']))
             return
 
         try:
@@ -961,20 +958,19 @@ class StakePool():
 
             if total_weight < 1:
                 logm(self.fp, 'Error: Reward withdrawal destinations weight sum is zero.')
-                sys.stdout.flush()
                 return
 
             outputs = []
             for withdraw_pair in dest_pairs:
                 amount = format8(int(withdraw_pair[1]) // int(total_weight))
                 outputs.append({'address': withdraw_pair[0], 'amount': amount})
-                logmt(self.fp, 'Withdrawing %s to: %s' % (amount, withdraw_pair[0]))
+                self.log('Withdrawing %s to: %s' % (amount, withdraw_pair[0]))
 
             ro = self.rpc_func('sendtypeto',
                                ['part', 'part', outputs, '', '', 4, 64, False, opts], 'pool_reward')
 
             txfee = int(decimal.Decimal(ro['fee']) * COIN)
-            logmt(self.fp, 'Withdrew %s in tx: %s\n' % (format8(withdraw_amount), ro['txid']))
+            self.log('Withdrew %s in tx: %s\n' % (format8(withdraw_amount), ro['txid']))
 
             dbkey = bytes([DBT_DATA]) + b'pool_fees'
             n = db.get(dbkey)
@@ -992,8 +988,7 @@ class StakePool():
                 logm(self.fp, 'Available balance after withdrawal %f' % (r['balance']))
 
         except Exception:
-            logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
-            sys.stdout.flush()
+            self.log('ERROR: %s\n' % (traceback.format_exc()))
 
     def checkBlocks(self, limit_blocks=-1):
         try:
@@ -1012,8 +1007,7 @@ class StakePool():
         except zmq.Again as e:
             pass
         except Exception:
-            logmt(self.fp, 'ERROR: %s\n' % (traceback.format_exc()))
-            sys.stdout.flush()
+            self.log('ERROR: %s\n' % (traceback.format_exc()))
 
     @getDBMutex
     def getAddressSummary(self, address_str):

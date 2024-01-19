@@ -3,7 +3,7 @@
 ## 0.24.0
 
 - New settings 'writelogfile' and 'logtime'
-- Flush stdout periodically for journalctl
+- Flush stdout for journalctl
 
 
 ## 0.21.0

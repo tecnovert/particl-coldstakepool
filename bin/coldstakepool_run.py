@@ -22,7 +22,6 @@ from coldstakepool.http_server import HttpThread
 from coldstakepool.util import (
     logmt,
     callrpc,
-    LOG_TIME,
 )
 
 ALLOW_CORS = True
@@ -50,15 +49,15 @@ def runStakePool(dataDir, chain):
         if settings.get('writelogfile', True):
             fp = open(os.path.join(dataDir, 'stakepool.log'), 'w')
 
-        LOG_TIME = settings.get('logtime', True)
-        logmt(fp, os.path.basename(sys.argv[0]) + ', version: ' + __version__ + '\n\n')
+        log_time: bool = settings.get('logtime', True)
+        logmt(fp, os.path.basename(sys.argv[0]) + ', version: ' + __version__ + '\n\n', log_time=log_time)
 
         stakePool = StakePool(fp, dataDir, settings, chain)
         stakePool.start()
 
         threads = []
         if 'htmlhost' in settings:
-            logmt(fp, 'Starting server at %s:%d.' % (settings['htmlhost'], settings['htmlport']))
+            logmt(fp, 'Starting server at %s:%d.' % (settings['htmlhost'], settings['htmlport']), log_time=log_time)
             allow_cors = settings.get('allowcors', ALLOW_CORS)
             key_salt = settings.get('management_key_salt', None)
             key_hash = settings.get('management_key_hash', None)
@@ -77,7 +76,7 @@ def runStakePool(dataDir, chain):
             time.sleep(0.5)
             stakePool.checkBlocks()
 
-        logmt(fp, 'Stopping threads.')
+        logmt(fp, 'Stopping threads.', log_time=log_time)
         for t in threads:
             t.stop()
             t.join()
