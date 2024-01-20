@@ -52,10 +52,10 @@
     (method git-fetch)
     (uri (git-reference
       (url "https://github.com/tecnovert/particl-coldstakepool")
-      (commit "5ef0f7f2b60e81352b7374e09ca3dcd6d2911643")))
+      (commit "aeaef8aef0ae4f2d66c255473eca9fd2275ce1ff")))
     (sha256
       (base32
-        "0hm7kkb3fixkyhd52ywd23p6c1afc9x4j00n30h0jc7bjvf63fzk"))
+        "0zykanvi0vi1360g66amdyhphqb40a4qx61f49vpm4f8g30xbaam"))
     (file-name (git-file-name name version))))
   (build-system python-build-system)
 
