@@ -216,7 +216,6 @@ class Test(unittest.TestCase):
         with open(settings_path) as fs:
             pool_settings = json.load(fs)
         pool_settings['startheight'] = 0
-        pool_settings['logtime'] = False
         pool_settings['parameters'][0]['payoutthreshold'] = 0.005
         pool_settings['parameters'][0]['minblocksbetweenpayments'] = 10
         with open(settings_path, 'w') as fp:

@@ -18,7 +18,6 @@ from functools import wraps
 from . import __version__
 from .util import (
     COIN,
-    logm,
     dumpj,
     logmt,
     format8,
@@ -211,8 +210,8 @@ class StakePool():
 
         self.rpc_func = make_rpc_func(self.rpc_host, self.rpc_port, self.rpc_auth)
 
-    def log(self, message):
-        logmt(self.fp, message, log_time=self.log_time)
+    def log(self, message, with_time=True):
+        logmt(self.fp, message, log_time=(self.log_time and with_time))
         sys.stdout.flush()
 
     def openDB(self, create_db=False):
@@ -860,9 +859,9 @@ class StakePool():
                 addrPaidout += v
                 totalDisbursed += v
                 if addrPending < 0:
-                    self.log('WARNING: txn %s overpays address %s more than pending payout, pending: %d, paid: %d.\n' % (txid, address, addrPending + v, v), True, True)
+                    self.log('WARNING: txn %s overpays address %s more than pending payout, pending: %d, paid: %d.\n' % (txid, address, addrPending + v, v))
                     if addrReward + (addrPending * COIN) < 0:
-                        self.log('WARNING: txn %s overpays address %s more than accumulated reward %d, paid: %d.\n' % (txid, address, addrPending + v, v), True, True)
+                        self.log('WARNING: txn %s overpays address %s more than accumulated reward %d, paid: %d.\n' % (txid, address, addrPending + v, v))
                     else:
                         # Reduce accumulated reward by amount overpaid
                         addrReward += addrPending * COIN
@@ -927,8 +926,8 @@ class StakePool():
         threshold = self.settings['poolownerwithdrawal']['threshold']
 
         if self.debug:
-            logm(self.fp, 'Balance %f, reserve %f, threshold %f\npool_reward %s, poolfees %s, pool_reward_withdrawn %s, pool_reward_bal %f' %
-                          (r['balance'], reserve, threshold, format8(decimal.Decimal(pool_reward)), format8(decimal.Decimal(poolfees)), format8(decimal.Decimal(pool_reward_withdrawn)), pool_reward_bal))
+            self.log('Balance %f, reserve %f, threshold %f\npool_reward %s, poolfees %s, pool_reward_withdrawn %s, pool_reward_bal %f' %
+                     (r['balance'], reserve, threshold, format8(decimal.Decimal(pool_reward)), format8(decimal.Decimal(poolfees)), format8(decimal.Decimal(pool_reward_withdrawn)), pool_reward_bal), with_time=False)
 
         if r['balance'] <= reserve or pool_reward_bal < reserve + threshold:
             return
@@ -957,7 +956,7 @@ class StakePool():
                 total_weight += weight
 
             if total_weight < 1:
-                logm(self.fp, 'Error: Reward withdrawal destinations weight sum is zero.')
+                self.log('Error: Reward withdrawal destinations weight sum is zero.', with_time=False)
                 return
 
             outputs = []
@@ -985,7 +984,7 @@ class StakePool():
                                  % (height, ro['txid'], -1, withdraw_pair[0], amount))
 
                 r = self.rpc_func('getwalletinfo', wallet='pool_reward')
-                logm(self.fp, 'Available balance after withdrawal %f' % (r['balance']))
+                self.log('Available balance after withdrawal %f' % (r['balance']), with_time=False)
 
         except Exception:
             self.log('ERROR: %s\n' % (traceback.format_exc()))
