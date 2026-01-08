@@ -7,13 +7,13 @@ RUN set -ex \
     && apt-get install -qq --no-install-recommends ca-certificates gosu libleveldb-dev libzmq3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install rapidjson packaging && \
+RUN pip3 install python-rapidjson && \
     wget https://github.com/tecnovert/particl-coldstakepool/archive/master.zip && \
     unzip master.zip && \
     cd particl-coldstakepool-master && \
-    python setup.py install
+    pip install .
 
-ENV STAKEPOOL_DATA /data
+ENV STAKEPOOL_DATA=/data
 VOLUME /data
 
 COPY entrypoint.sh /entrypoint.sh
