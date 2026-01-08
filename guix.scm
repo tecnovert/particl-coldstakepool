@@ -1,38 +1,42 @@
 (define-module (guix)
 #:use-module (guix packages)
 #:use-module ((guix licenses) #:prefix license:)
-#:use-module (guix build-system python)
 #:use-module (guix build-system gnu)
-#:use-module (guix git-download)
+#:use-module (guix build-system python)
 #:use-module (guix download)
+#:use-module (guix git-download)
 #:use-module (guix search-paths)
-#:use-module (gnu packages)
-#:use-module (gnu packages pkg-config)
 #:use-module (gnu packages autotools)
 #:use-module (gnu packages certs)
 #:use-module (gnu packages check)
 #:use-module (gnu packages databases)
 #:use-module (gnu packages gnupg)
-#:use-module (gnu packages wget)
+#:use-module (gnu packages libffi)
+#:use-module (gnu packages license)
+#:use-module (gnu packages nss)
+#:use-module (gnu packages pkg-config)
 #:use-module (gnu packages python)
 #:use-module (gnu packages python-build)
+#:use-module (gnu packages python-check)
 #:use-module (gnu packages python-crypto)
 #:use-module (gnu packages python-xyz)
-#:use-module (gnu packages libffi)
-#:use-module (gnu packages license))
+#:use-module (gnu packages wget)
+#:use-module (gnu packages))
 
 
 (define-public python-plyvel
   (package
     (name "python-plyvel")
-    (version "1.5.0")
+    (version "1.5.1")
     (source
      (origin
        (method url-fetch)
        (uri (pypi-uri "plyvel" version))
        (sha256
-        (base32 "0ar0z53nhi9q3kvpmpkk2pzb46lmmwn79a02sb9vq2k9645qx4fd"))))
+        (base32 "17018r7c73r1c4hxz2544rf4jmkyvbrmwgrdf7wgn97wwh4n1brw"))))
     (build-system python-build-system)
+    (arguments
+      (list #:tests? #f)) ; Disable the tests phase - test removed from setuptools
     (inputs
      (list leveldb))
     (native-inputs
@@ -52,10 +56,10 @@
     (method git-fetch)
     (uri (git-reference
       (url "https://github.com/tecnovert/particl-coldstakepool")
-      (commit "aeaef8aef0ae4f2d66c255473eca9fd2275ce1ff")))
+      (commit "488b9c71e4a0be3081bad8ae620f62d3f05f290c")))
     (sha256
       (base32
-        "0zykanvi0vi1360g66amdyhphqb40a4qx61f49vpm4f8g30xbaam"))
+        "0rinw1l29kd5f4wsaasq4vbf4pngr64nbjfrn3q09fyg12awy4jl"))
     (file-name (git-file-name name version))))
   (build-system python-build-system)
 
