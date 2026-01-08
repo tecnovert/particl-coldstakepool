@@ -1,22 +1,22 @@
 # https://github.com/NicolasDorier/docker-bitcoin/blob/master/README.md
 
-FROM debian:stretch-slim
+FROM debian:bullseye-slim
 
 RUN groupadd -r particl && useradd -r -m -g particl particl
 
 RUN set -ex \
     && apt-get update \
-    && apt-get install -qq --no-install-recommends ca-certificates dirmngr gosu gpg wget \
+    && apt-get install -qq --no-install-recommends ca-certificates dirmngr gosu gnupg2 gnupg-agent wget \
     && rm -rf /var/lib/apt/lists/*
 
-ENV PARTICL_VERSION 0.19.2.23
-ENV PARTICL_REPO particl
-ENV PARTICL_FILE particl-${PARTICL_VERSION}-x86_64-linux-gnu_nousb.tar.gz
-ENV PARTICL_URL https://github.com/${PARTICL_REPO}/particl-core/releases/download/v${PARTICL_VERSION}/
-ENV PARTICL_SHA256 85cafb4f0afa5490915222e0016cdba1d4b0a9ecfc8368b4daa9e3db1f884a46
-ENV PARTICL_ASC_URL https://raw.githubusercontent.com/${PARTICL_REPO}/gitian.sigs/master/${PARTICL_VERSION}-linux/tecnovert/particl-linux-${PARTICL_VERSION}-build.assert
-ENV PARTICL_SIG_URL https://raw.githubusercontent.com/${PARTICL_REPO}/gitian.sigs/master/${PARTICL_VERSION}-linux/tecnovert/particl-linux-${PARTICL_VERSION}-build.assert.sig
-ENV PARTICL_PGP_KEY 8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B
+ENV PARTICL_VERSION=0.19.2.24
+ENV PARTICL_REPO=particl
+ENV PARTICL_FILE=particl-${PARTICL_VERSION}-x86_64-linux-gnu_nousb.tar.gz
+ENV PARTICL_URL=https://github.com/${PARTICL_REPO}/particl-core/releases/download/v${PARTICL_VERSION}/
+ENV PARTICL_SHA256=ceeb2c7c802376fb21e9dc455d05f32f50fc823c6a3e180dc1d3ace5342afd28
+ENV PARTICL_ASC_URL=https://raw.githubusercontent.com/${PARTICL_REPO}/gitian.sigs/master/${PARTICL_VERSION}-linux/tecnovert/particl-linux-${PARTICL_VERSION}-build.assert
+ENV PARTICL_SIG_URL=https://raw.githubusercontent.com/${PARTICL_REPO}/gitian.sigs/master/${PARTICL_VERSION}-linux/tecnovert/particl-linux-${PARTICL_VERSION}-build.assert.sig
+ENV PARTICL_PGP_KEYID=8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B
 
 # install particl binaries
 RUN set -ex \
@@ -24,7 +24,7 @@ RUN set -ex \
     && wget -qO "$PARTICL_FILE" "$PARTICL_URL$PARTICL_FILE" \
     && echo "$PARTICL_SHA256 $PARTICL_FILE" | sha256sum -c - \
     && for key in \
-        $PARTICL_PGP_KEY \
+        $PARTICL_PGP_KEYID \
     ; do \
         gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$key" || \
         gpg --batch --keyserver pgp.mit.edu --recv-keys "$key" || \
@@ -39,7 +39,7 @@ RUN set -ex \
     && tar -xzvf "$PARTICL_FILE" -C /usr/local --strip-components=1 --exclude=*-qt \
     && rm -rf /tmp/*
 
-ENV PARTICL_DATA /data
+ENV PARTICL_DATA=/data
 RUN mkdir -p "$PARTICL_DATA" \
     && chown -R particl:particl "$PARTICL_DATA" \
     && ln -sfn "$PARTICL_DATA" /home/particl/.particl \
