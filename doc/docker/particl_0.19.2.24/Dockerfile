@@ -1,12 +1,10 @@
 # https://github.com/NicolasDorier/docker-bitcoin/blob/master/README.md
 
-FROM debian:bookworm-slim
-
-RUN groupadd -r particl && useradd -r -m -g particl particl
+FROM debian:bookworm-slim AS build
 
 RUN set -ex \
     && apt-get update \
-    && apt-get install -qq --no-install-recommends ca-certificates dirmngr gosu gnupg2 gnupg-agent wget \
+    && apt-get install -qq --no-install-recommends ca-certificates dirmngr gnupg2 gnupg-agent wget \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PARTICL_VERSION=0.19.2.24
@@ -36,8 +34,21 @@ RUN set -ex \
     && wget -qO particl.sig "$PARTICL_SIG_URL" \
     && sha256sum --ignore-missing --check particl.asc \
     && gpg --verify particl.sig particl.asc \
-    && tar -xzvf "$PARTICL_FILE" -C /usr/local --strip-components=1 --exclude=*-qt \
+    && mkdir /particl_out \
+    && tar -xzvf "$PARTICL_FILE" -C /particl_out --strip-components=1 --exclude=*-qt \
     && rm -rf /tmp/*
+
+
+FROM debian:bookworm-slim AS final
+
+COPY --from=build /particl_out/bin/* /usr/local/bin/
+
+RUN set -ex \
+    && apt-get update \
+    && apt-get install -qq --no-install-recommends gosu \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r particl && useradd -r -m -g particl particl
 
 ENV PARTICL_DATA=/data
 RUN mkdir -p "$PARTICL_DATA" \
