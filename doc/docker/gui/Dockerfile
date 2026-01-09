@@ -1,4 +1,4 @@
-FROM debian:stretch-slim
+FROM debian:bullseye-slim
 
 
 RUN set -ex && \
@@ -6,7 +6,7 @@ RUN set -ex && \
     apt-get install -qq --no-install-recommends ca-certificates dirmngr gnupg gosu wget git build-essential curl nginx xz-utils apt-transport-https python2.7 && \
     rm -rf /var/lib/apt/lists/*
 
-ENV NODE_VERSION "11.4.0"
+ENV NODE_VERSION="11.15.0"
 
 # Install NodeJS:
 RUN cd / && \
