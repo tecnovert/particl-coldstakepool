@@ -1,6 +1,6 @@
 # https://github.com/NicolasDorier/docker-bitcoin/blob/master/README.md
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 RUN groupadd -r particl && useradd -r -m -g particl particl
 

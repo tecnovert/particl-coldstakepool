@@ -1,27 +1,25 @@
-FROM debian:bullseye-slim
-
+FROM debian:bookworm-slim
 
 RUN set -ex && \
     apt-get update && \
-    apt-get install -qq --no-install-recommends ca-certificates dirmngr gnupg gosu wget git build-essential curl nginx xz-utils apt-transport-https python2.7 && \
+    apt-get install -qq --no-install-recommends ca-certificates dirmngr gnupg gosu git build-essential curl nginx xz-utils apt-transport-https python3 && \
     rm -rf /var/lib/apt/lists/*
 
+ENV ARCH="x64"
 ENV NODE_VERSION="11.15.0"
 
 # Install NodeJS:
 RUN cd / && \
-    wget https://nodejs.org/download/release/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz && \
-    tar xvf node-v${NODE_VERSION}-linux-x64.tar.xz --strip-components=1 && \
-    ls /bin && \
-    ln -s /bin/node /usr/bin/nodejs && \
-    ln -s /usr/bin/python2.7 /usr/bin/python && \
+    curl -fsSLO --compressed "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-$ARCH.tar.xz" && \
+    tar -xJf "node-v$NODE_VERSION-linux-$ARCH.tar.xz" -C /usr/local --strip-components=1 --no-same-owner && \
+    rm "node-v$NODE_VERSION-linux-$ARCH.tar.xz" && \
+    ln -s /usr/local/bin/node /usr/local/bin/nodejs && \
     node -v
 
 # Install Yarn:
 RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - && \
     echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list && \
-    apt update && apt install  --no-install-recommends -y yarn
-
+    apt update && apt install --no-install-recommends -y yarn
 
 RUN git clone https://github.com/gerlofvanek/particl-coldstakepool-front && \
     cd particl-coldstakepool-front && \
