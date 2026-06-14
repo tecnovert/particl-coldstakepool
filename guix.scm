@@ -40,7 +40,7 @@
     (inputs
      (list leveldb))
     (native-inputs
-     (list pkg-config python-cython python-pytest))
+     (list pkg-config python-cython python-pytest python-setuptools))
     (home-page "https://github.com/wbolster/plyvel")
     (synopsis "Python bindings for 0MQ")
     (description
@@ -51,15 +51,15 @@
 (define-public particl-coldstakepool
 (package
   (name "particl-coldstakepool")
-  (version "0.24.0")
+  (version "0.25.0")
   (source (origin
     (method git-fetch)
     (uri (git-reference
       (url "https://github.com/tecnovert/particl-coldstakepool")
-      (commit "488b9c71e4a0be3081bad8ae620f62d3f05f290c")))
+      (commit "d816b015c8477afb3d50225fba4df2c2ab96704a")))
     (sha256
       (base32
-        "0rinw1l29kd5f4wsaasq4vbf4pngr64nbjfrn3q09fyg12awy4jl"))
+        "0xp5sr69bp0mlr5031byhdr6lypkm88ddwk386scs28742fypyqb"))
     (file-name (git-file-name name version))))
   (build-system python-build-system)
 
