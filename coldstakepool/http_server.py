@@ -224,7 +224,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.send_header('Content-type', content_type)
         self.end_headers()
 
-    def handle_http(self, status_code, path):
+    def handle_http(self, status_code, path, method='GET'):
         urlSplit = self.path.split('/')
         is_json = False
         try:
@@ -239,12 +239,16 @@ class HttpHandler(BaseHTTPRequestHandler):
                         if urlSplit[2] == 'address':
                             return self.js_address(urlSplit)
                         if urlSplit[2] == 'metrics':
+                            if method != 'POST':
+                                raise ValueError('POST required')
                             return self.js_metrics(urlSplit)
                         if urlSplit[2] == 'version':
                             return bytes(json.dumps(self.server.stakePool.getVersions()), 'UTF-8')
                         if urlSplit[2] == 'voting':
                             return bytes(json.dumps(self.server.stakePool.getVotingInfo()), 'UTF-8')
                         if urlSplit[2] == 'pending':
+                            if method != 'POST':
+                                raise ValueError('POST required')
                             return self.js_pending(urlSplit)
                     return self.js_index(urlSplit)
                 self.putHeaders(status_code, 'text/html')
@@ -266,7 +270,15 @@ class HttpHandler(BaseHTTPRequestHandler):
             return self.js_error(str(e)) if is_json else self.page_error(str(e))
 
     def do_GET(self):
-        response = self.handle_http(200, self.path)
+        response = self.handle_http(200, self.path, 'GET')
+        self.wfile.write(response)
+
+    def do_POST(self):
+        # Drain any request body so the connection stays in sync
+        length = int(self.headers.get('Content-Length', 0) or 0)
+        if length > 0:
+            self.rfile.read(length)
+        response = self.handle_http(200, self.path, 'POST')
         self.wfile.write(response)
 
     def do_HEAD(self):
