@@ -31,7 +31,7 @@
     (source
      (origin
        (method url-fetch)
-       (uri (pypi-uri "plyvel" version))
+       (uri ((@ (guix build-system pyproject) pypi-uri) "plyvel" version))
        (sha256
         (base32 "17018r7c73r1c4hxz2544rf4jmkyvbrmwgrdf7wgn97wwh4n1brw"))))
     (build-system python-build-system)
