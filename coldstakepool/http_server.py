@@ -5,6 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
+import html
 import time
 import decimal
 import hashlib
@@ -26,7 +27,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             + '<meta charset="UTF-8">' \
             + '<title>Particl Stake Pool Error</title></head>' \
             + '<body>' \
-            + '<p>Error: ' + error_str + '</p>' \
+            + '<p>Error: ' + html.escape(error_str) + '</p>' \
             + '<p><a href=\'/\'>home</a></p>' \
             + '</body></html>'
         return bytes(content, 'UTF-8')
@@ -96,8 +97,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             + '<meta charset="UTF-8">' \
             + '<title>Particl Stake Pool Address </title></head>' \
             + '<body>' \
-            + '<h2>Spend Address ' + address_str + '</h2>' \
-            + '<h4>Pool Address ' + stakePool.poolAddr + '</h4>'
+            + '<h2>Spend Address ' + html.escape(address_str) + '</h2>' \
+            + '<h4>Pool Address ' + html.escape(stakePool.poolAddr) + '</h4>'
 
         if 'accumulated' in summary:
             content += '<table>' \
@@ -121,7 +122,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         vote_settings_content = ''
         for r in voting_settings:
             set_at = time.strftime('%Y-%m-%d %H-%M-%S %z', time.gmtime(int(r['added'])))
-            vote_settings_content += '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>'.format(r['proposal'], r['option'], r['from_height'], r['to_height'], set_at)
+            vote_settings_content += '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>'.format(html.escape(str(r['proposal'])), html.escape(str(r['option'])), html.escape(str(r['from_height'])), html.escape(str(r['to_height'])), html.escape(set_at))
 
         content = '<!DOCTYPE html><html lang="en">\n<head>' \
             + '<meta charset="UTF-8">' \
@@ -145,8 +146,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             + '<body>' \
             + '<h2>Particl Stake Pool Version</h2>' \
             + '<p>' \
-            + 'Pool Version: ' + versions['pool'] + '<br/>' \
-            + 'Core Version: ' + versions['core'] + '<br/>' \
+            + 'Pool Version: ' + html.escape(str(versions['pool'])) + '<br/>' \
+            + 'Core Version: ' + html.escape(str(versions['core'])) + '<br/>' \
             + '</p>' \
             + '<p><a href=\'/\'>home</a></p></body></html>'
         return bytes(content, 'UTF-8')
@@ -161,8 +162,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             + '<body>' \
             + '<h2>Particl Stake Pool</h2>' \
             + '<p>' \
-            + 'Mode: ' + summary['poolmode'] + '<br/>' \
-            + 'Pool Address: ' + stakePool.poolAddr + '<br/>' \
+            + 'Mode: ' + html.escape(str(summary['poolmode'])) + '<br/>' \
+            + 'Pool Address: ' + html.escape(stakePool.poolAddr) + '<br/>' \
             + 'Pool Fee: ' + str(stakePool.poolFeePercent) + '%<br/>' \
             + 'Stake Bonus: ' + str(stakePool.stakeBonusPercent) + '%<br/>' \
             + 'Payout Threshold: ' + format8(stakePool.payoutThreshold) + '<br/>' \
@@ -188,17 +189,17 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         content += '<br/><h3>Recent Blocks</h3><table><tr><th>Height</th><th>Block Hash</th><th>Block Reward</th><th>Total Coin Staking</th></tr>'
         for b in summary['lastblocks']:
-            content += '<tr><td>' + str(b[0]) + '</td><td>' + b[1] + '</td><td>' + format8(b[2]) + '</td><td>' + format8(b[3]) + '</td></tr>'
+            content += '<tr><td>' + str(b[0]) + '</td><td>' + html.escape(str(b[1])) + '</td><td>' + format8(b[2]) + '</td><td>' + format8(b[3]) + '</td></tr>'
         content += '</table>'
 
         content += '<br/><h3>Pending Payments</h3><table><tr><th>Txid</th><th>Disbursed</th></tr>'
         for b in summary['pendingpayments']:
-            content += '<tr><td>' + b[0] + '</td><td>' + format8(b[1]) + '</td></tr>'
+            content += '<tr><td>' + html.escape(str(b[0])) + '</td><td>' + format8(b[1]) + '</td></tr>'
         content += '</table>'
 
         content += '<br/><h3>Last Payments</h3><table><tr><th>Height</th><th>Txid</th><th>Disbursed</th></tr>'
         for b in summary['lastpayments']:
-            content += '<tr><td>' + str(b[0]) + '</td><td>' + b[1] + '</td><td>' + format8(b[2]) + '</td></tr>'
+            content += '<tr><td>' + str(b[0]) + '</td><td>' + html.escape(str(b[1])) + '</td><td>' + format8(b[2]) + '</td></tr>'
         content += '</table>'
 
         content += '</body></html>'
