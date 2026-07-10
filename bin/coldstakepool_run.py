@@ -24,7 +24,7 @@ from coldstakepool.util import (
     callrpc,
 )
 
-ALLOW_CORS = True
+ALLOW_CORS = False
 stakePool = None
 
 
