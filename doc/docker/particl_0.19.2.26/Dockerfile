@@ -1,17 +1,17 @@
 # https://github.com/NicolasDorier/docker-bitcoin/blob/master/README.md
 
-FROM debian:bookworm-slim AS build
+FROM debian:trixie-slim AS build
 
 RUN set -ex \
     && apt-get update \
     && apt-get install -qq --no-install-recommends ca-certificates dirmngr gnupg2 gnupg-agent wget \
     && rm -rf /var/lib/apt/lists/*
 
-ENV PARTICL_VERSION=0.19.2.25
+ENV PARTICL_VERSION=0.19.2.26
 ENV PARTICL_REPO=particl
 ENV PARTICL_FILE=particl-${PARTICL_VERSION}-x86_64-linux-gnu_nousb.tar.gz
 ENV PARTICL_URL=https://github.com/${PARTICL_REPO}/particl-core/releases/download/v${PARTICL_VERSION}/
-ENV PARTICL_SHA256=5fb55390361e0df3039870a4dcc8b65260a0fe2b1723637aec0a01af6d17692f
+ENV PARTICL_SHA256=0132dd16719a51897b8ed238f6079f36dcd2d526c4bcf6a404ad62a51bb08961
 ENV PARTICL_ASC_URL=https://raw.githubusercontent.com/${PARTICL_REPO}/gitian.sigs/master/${PARTICL_VERSION}-linux/tecnovert/particl-linux-${PARTICL_VERSION}-build.assert
 ENV PARTICL_SIG_URL=https://raw.githubusercontent.com/${PARTICL_REPO}/gitian.sigs/master/${PARTICL_VERSION}-linux/tecnovert/particl-linux-${PARTICL_VERSION}-build.assert.sig
 ENV PARTICL_PGP_KEYID=8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B
