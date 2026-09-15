@@ -51,15 +51,15 @@
 (define-public particl-coldstakepool
 (package
   (name "particl-coldstakepool")
-  (version "0.25.0")
+  (version "0.26.0")
   (source (origin
     (method git-fetch)
     (uri (git-reference
       (url "https://github.com/tecnovert/particl-coldstakepool")
-      (commit "d816b015c8477afb3d50225fba4df2c2ab96704a")))
+      (commit "4773fa6a03dfb0545d839e9ec80cfa1e527c1fdd")))
     (sha256
       (base32
-        "0xp5sr69bp0mlr5031byhdr6lypkm88ddwk386scs28742fypyqb"))
+        "18cdh1h8idpmkpyv28v1n7k3kmr6nf27vn5099f8hxb0zv31d8mj"))
     (file-name (git-file-name name version))))
   (build-system python-build-system)
 
